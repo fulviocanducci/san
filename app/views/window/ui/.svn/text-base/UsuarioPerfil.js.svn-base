@@ -1,0 +1,162 @@
+Ext.define('Autenticar.window.ui.UsuarioPerfil', {
+    extend: 'Champion.window.Base',
+    requires: ['Ext.ux.StatusBar'],
+    id: 'Autenticar.window.UsuarioPerfil',
+    layout: {
+        type: 'vbox',
+        align: 'stretch'
+    },
+    bodyPadding: 10,
+    height: 450,
+    width: 600,
+    title: 'Associação de Usuário à Perfis',
+    modal: true,
+    resizable: false,
+    initComponent: function() {
+        var me = this;
+        Ext.applyIf(me, {
+            defaults: {
+                anchor: '100%'
+            },
+            items: [
+            {
+                xtype: 'form',
+                title: 'Perfis',
+                padding: '0 0 5 0',
+                autoScroll: true,
+                layout: 'anchor',
+                defaults: {
+                    anchor: '100%'
+                },
+                items: [
+                this.getGridPerfis()
+                ],
+                flex: 1
+            },
+            this.getPainelUsuarios()
+            ],
+            bbar: this.getBarraStatus()
+        });
+        me.callParent(arguments);
+    },
+    getBarraStatus: function() {
+        if (!this.barraStatus) {
+            this.barraStatus = Ext.widget("statusbar", {
+                border: false,
+                defaultText: '',
+                text: '',
+                iconCls: 'x-status-valid',
+                items: [
+                {
+                    text: 'Fechar',
+                    iconCls: 'silk-cross',
+                    handler: function() {
+                        this.close();
+                    },
+                    scope: this
+                }
+                ]
+            });
+        }
+        return this.barraStatus;
+    },
+    getGridPerfis: function() {
+        if (!this.gridPerfis) {
+            this.gridPerfis = Ext.widget("grid", {
+                border: false,
+                viewConfig  : {
+                    loadMask: true
+                },                
+                store: this.storePerfilSistema,
+                columns: [
+                {
+                    header: 'Nome',
+                    dataIndex: 'nome',
+                    flex: 1
+                }
+                ],
+                listeners: {
+                    itemclick: function(el, record) {
+                        this.perfil_id = record.internalId;
+                        if (this.temPermissaoIncluir()) {
+                            this.getBotaoAdicionarUsuario().enable();
+                        }
+                        this.resetarPainelUsuarios();
+                    },
+                    scope: this
+                }
+
+            });
+        }
+        return this.gridPerfis;
+    },
+    getPainelUsuarios: function() {
+        if (!this.painelUsuario) {
+            this.painelUsuario = Ext.widget("panel", {
+                layout: 'fit',
+                padding: '5 0 0 0',
+                items: [{
+                    xtype: 'grid',
+                    border: false,
+                    autoScroll: true,
+                    height: 200,
+                    title: 'Usuários',
+                    store: this.storeUsuarioPerfil,
+                    multiSelect: true,
+                    columns: [
+                    {
+                        header: 'Nome',
+                        dataIndex: 'nome',
+                        flex: 1
+                    }
+                    ],
+                    listeners: {
+                        itemclick: function(el, record) {
+                            this.usuario_id = record.internalId;
+                            if (this.temPermissaoExcluir()) {
+                                this.getBotaoRemoverUsuario().enable();
+                            }
+                        },
+                        scope: this
+                    }
+
+                }],
+                rbar: [
+                this.getBotaoAdicionarUsuario(),
+                this.getBotaoRemoverUsuario()
+                ],
+                flex: 1
+            });
+        }
+        return this.painelUsuario;
+    },
+    getBotaoAdicionarUsuario: function() {
+        if (!this.botaoAdicionarUsuario) {
+            this.botaoAdicionarUsuario = Ext.widget("button", {
+                iconCls: 'silk-add',
+                disabled: true,
+                handler: function() {
+                    Ext.create('Autenticar.window.Usuario', {
+                        sistema_id: this.sistema_id,
+                        perfil_id: this.perfil_id
+                    }).show();
+                },
+                scope: this
+            });
+        }
+        return this.botaoAdicionarUsuario;
+    },
+    getBotaoRemoverUsuario: function() {
+        if (!this.botaoRemoverUsuario) {
+            this.botaoRemoverUsuario = Ext.widget("button", {
+                iconCls: 'silk-delete',
+                disabled: true,
+                handler: function() {
+                    this.excluir();
+                },
+                scope: this
+            });
+        }
+        return this.botaoRemoverUsuario;
+    }
+});

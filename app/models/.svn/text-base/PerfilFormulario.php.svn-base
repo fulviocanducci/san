@@ -1,0 +1,86 @@
+<?php
+
+namespace TCE\Autenticar\models;
+
+class PerfilFormulario extends \Doctrine_Record {
+
+    public function setTableDefinition()
+    {
+        $this->setTableName('PerfilFormulario');
+        $this->hasColumn('id', 'integer', 4, array(
+            'type' => 'integer',
+            'length' => '4',
+            'fixed' => FALSE,
+            'unsigned' => FALSE,
+            'primary' => TRUE,
+            'autoincrement' => TRUE,
+        ));
+        $this->hasColumn('perfil_id', 'integer', 4, array(
+            'type' => 'integer',
+            'length' => '4',
+            'fixed' => FALSE,
+            'unsigned' => FALSE,
+            'notnull' => TRUE,
+            'primary' => FALSE,
+            'autoincrement' => FALSE,
+        ));
+        $this->hasColumn('formulario_id', 'integer', 4, array(
+            'type' => 'integer',
+            'length' => '4',
+            'fixed' => FALSE,
+            'unsigned' => FALSE,
+            'notnull' => TRUE,
+            'primary' => FALSE,
+            'autoincrement' => FALSE,
+        ));
+        $this->hasColumn('incluir', 'integer', 1, array(
+            'type' => 'integer',
+            'length' => '1',
+            'fixed' => FALSE,
+            'unsigned' => FALSE,
+            'notnull' => TRUE,
+            'primary' => FALSE,
+            'autoincrement' => FALSE,
+        ));
+        $this->hasColumn('alterar', 'integer', 1, array(
+            'type' => 'integer',
+            'length' => '1',
+            'fixed' => FALSE,
+            'unsigned' => FALSE,
+            'notnull' => TRUE,
+            'primary' => FALSE,
+            'autoincrement' => FALSE,
+        ));
+        $this->hasColumn('excluir', 'integer', 1, array(
+            'type' => 'integer',
+            'length' => '1',
+            'fixed' => FALSE,
+            'unsigned' => FALSE,
+            'notnull' => TRUE,
+            'primary' => FALSE,
+            'autoincrement' => FALSE,
+        ));
+        $this->hasColumn('acesso_externo', 'integer', 1, array(
+            'type' => 'integer',
+            'length' => '1',
+            'fixed' => FALSE,
+            'unsigned' => FALSE,
+            'notnull' => TRUE,
+            'primary' => FALSE,
+            'autoincrement' => FALSE,
+        ));
+    }
+
+    public function setUp()
+    {
+        parent::setUp();
+        $this->hasOne('TCE\Autenticar\models\Perfil as Perfil', array(
+            'local' => 'perfil_id',
+            'foreign' => 'id'));
+
+        $this->hasOne('TCE\Autenticar\models\Formulario as Formulario', array(
+            'local' => 'formulario_id',
+            'foreign' => 'id'));
+    }
+
+}

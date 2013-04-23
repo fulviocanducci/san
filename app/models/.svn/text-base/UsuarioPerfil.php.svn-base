@@ -1,0 +1,50 @@
+<?php
+
+namespace TCE\Autenticar\models;
+
+class UsuarioPerfil extends \Doctrine_Record {
+
+    public function setTableDefinition()
+    {
+        $this->setTableName('UsuarioPerfil');
+        $this->hasColumn('id', 'integer', 4, array(
+            'type' => 'integer',
+            'length' => '4',
+            'fixed' => FALSE,
+            'unsigned' => FALSE,
+            'primary' => TRUE,
+            'autoincrement' => TRUE,
+        ));
+        $this->hasColumn('usuario_id', 'integer', 4, array(
+            'type' => 'integer',
+            'length' => '4',
+            'fixed' => FALSE,
+            'unsigned' => FALSE,
+            'notnull' => TRUE,
+            'primary' => FALSE,
+            'autoincrement' => FALSE,
+        ));
+        $this->hasColumn('perfil_id', 'integer', 4, array(
+            'type' => 'integer',
+            'length' => '4',
+            'fixed' => FALSE,
+            'unsigned' => FALSE,
+            'notnull' => TRUE,
+            'primary' => FALSE,
+            'autoincrement' => FALSE,
+        ));
+    }
+
+    public function setUp()
+    {
+        parent::setUp();
+        $this->hasOne('TCE\Autenticar\models\Usuario as Usuario', array(
+            'local' => 'usuario_id',
+            'foreign' => 'id'));
+
+        $this->hasOne('TCE\Autenticar\models\Perfil as Perfil', array(
+            'local' => 'perfil_id',
+            'foreign' => 'id'));
+    }
+
+}

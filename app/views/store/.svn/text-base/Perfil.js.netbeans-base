@@ -1,0 +1,26 @@
+Ext.define('Autenticar.store.Perfil', {
+    extend: 'Champion.store.Base',
+    storeId: 'Autenticar.store.Perfil',
+    fields: ['descricao', 'padrao'],
+    proxy: {
+        type: 'ajax',
+        actionMethods: {
+            create: 'POST',
+            read: 'POST',
+            update: 'POST',
+            destroy: 'POST'
+        },
+        api: {
+            read: TCE.Autenticar.getUrlController('Perfil', 'getTodos'),
+            destroy: TCE.Autenticar.getUrlController('Perfil', 'excluir')
+        },
+        reader: {
+            type: 'json',
+            root: 'raiz'
+        },
+        writer: {
+            type: 'json',
+            root: 'raiz'
+        }
+    }
+});

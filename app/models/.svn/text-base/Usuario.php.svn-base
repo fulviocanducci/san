@@ -1,0 +1,85 @@
+<?php
+
+namespace TCE\Autenticar\models;
+
+class Usuario extends \Doctrine_Record {
+
+    public function setTableDefinition()
+    {
+        $this->setTableName('Usuario');
+        $this->hasColumn('id', 'integer', 4, array(
+            'type' => 'integer',
+            'length' => '4',
+            'fixed' => FALSE,
+            'unsigned' => FALSE,
+            'primary' => TRUE,
+            'autoincrement' => TRUE,
+        ));
+        $this->hasColumn('nome', 'string', 160, array(
+            'type' => 'string',
+            'length' => '160',
+            'fixed' => FALSE,
+            'unsigned' => FALSE,
+            'notnull' => TRUE,
+            'primary' => FALSE,
+            'autoincrement' => FALSE,
+        ));
+        $this->hasColumn('cpf', 'string', 11, array(
+            'type' => 'string',
+            'length' => '11',
+            'fixed' => FALSE,
+            'unsigned' => FALSE,
+            'notnull' => TRUE,
+            'primary' => FALSE,
+            'autoincrement' => FALSE,
+        ));
+        $this->hasColumn('matricula', 'string', 20, array(
+            'type' => 'string',
+            'length' => '20',
+            'fixed' => FALSE,
+            'unsigned' => FALSE,
+            'notnull' => FALSE,
+            'primary' => FALSE,
+            'autoincrement' => FALSE,
+        ));
+        $this->hasColumn('login', 'string', 100, array(
+            'type' => 'string',
+            'length' => '100',
+            'fixed' => FALSE,
+            'unsigned' => FALSE,
+            'notnull' => FALSE,
+            'primary' => FALSE,
+            'autoincrement' => FALSE,
+        ));
+        $this->hasColumn('senha', 'string', 64, array(
+            'type' => 'string',
+            'length' => '64',
+            'fixed' => TRUE,
+            'unsigned' => FALSE,
+            'notnull' => FALSE,
+            'primary' => FALSE,
+            'autoincrement' => FALSE,
+        ));
+        $this->hasColumn('ultimo_acesso', 'timestamp', 16, array(
+            'type' => 'timestamp',
+            'length' => '16',
+            'fixed' => FALSE,
+            'unsigned' => FALSE,
+            'notnull' => TRUE,
+            'primary' => FALSE,
+            'autoincrement' => FALSE,
+        ));
+    }
+
+    public function setUp()
+    {
+        parent::setUp();
+        $this->hasMany('TCE\Autenticar\models\UsuarioPerfil as UsuarioPerfil', array(
+            'local' => 'id',
+            'foreign' => 'usuario_id'));
+        $this->hasOne('TCE\Autenticar\models\Servidor as Servidor', array(
+            'local' => 'login',
+            'foreign' => 'id'));
+    }
+
+}

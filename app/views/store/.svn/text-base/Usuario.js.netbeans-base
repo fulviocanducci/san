@@ -1,0 +1,19 @@
+Ext.define('Autenticar.store.Usuario', {
+    extend: 'Champion.store.Base',
+    storeId: 'Autenticar.store.Usuario',
+    fields: ['id', 'nome'],
+    proxy: {
+        type: 'ajax',
+        actionMethods: {
+            create: 'POST',
+            read: 'POST',
+            update: 'POST',
+            destroy: 'POST'
+        },
+        url: '/autenticar/app/controllers/?c=TCE_Autenticar_Usuario&m=getUsuarioPorNome',
+        reader: {
+            type: 'json',
+            root: 'raiz'
+        }
+    }
+});

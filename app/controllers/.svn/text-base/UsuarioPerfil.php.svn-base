@@ -1,0 +1,254 @@
+<?php
+
+namespace TCE\Autenticar\controllers;
+
+/** @RemoteClass */
+class UsuarioPerfil extends \Champion\Controller {
+
+    const RETORNO_LITERAL = 1;
+    const RETORNO_JSON = 2;
+
+    /** @RemoteMethod(AllowInvoke=TRUE) */
+    public function salvar()
+    {
+        try {
+            $sistema_id = $_POST['sistema_id'];
+            $usuario_id = $_POST['usuario_id'];
+            $q = \Doctrine_Core::getTable("TCE\Autenticar\models\UsuarioPerfil")
+                    ->createQuery("up")
+                    ->select("up.id")
+                    ->innerJoin("up.Perfil p")
+                    ->innerJoin("p.Sistema s")
+                    ->where("up.usuario_id = ?", $usuario_id)
+                    ->andWhere("s.id = ?", $sistema_id);
+            if ($q->count() > 0) {
+                $usuarioPerfil = $q->execute();
+                $usuario_perfil_id = array();
+                foreach ($usuarioPerfil as $up) {
+                    if (!in_array($up->perfil_id, $_POST['perfil_id'])) {
+                        \Doctrine_Core::getTable("TCE\Autenticar\models\UsuarioPerfil")
+                                ->find($up->id)
+                                ->delete();
+                    }
+                    $usuario_perfil_id[] = $up->perfil_id;
+                }
+                $usuarioPerfil->free();
+            }
+            $usuario_perfil_id = array_diff($_POST['perfil_id'], $usuario_perfil_id);
+            foreach ($usuario_perfil_id as $perfil_id) {
+                $usuarioPerfil = new \TCE\Autenticar\models\UsuarioPerfil();
+                $usuarioPerfil->usuario_id = $usuario_id;
+                $usuarioPerfil->perfil_id = $perfil_id;
+                $usuarioPerfil->save();
+            }
+            return array(
+                'success' => TRUE,
+                'mb' => array(
+                    'title' => "Sucesso",
+                    'msg' => "Perfil aplicado com sucesso.",
+                    'action' => $this->_minify("
+                            Ext.getCmp('Autenticar.window.form.UsuarioPerfil.aplicar').disable();
+                     ")
+                )
+            );
+        } catch (\Champion\Exception $exc) {
+            return array(
+                'success' => FALSE,
+                'mb' => array(
+                    'title' => "Falha",
+                    'msg' => $exc->getMessage(),
+                    'action' => $this->_minify("
+                    ")
+                )
+            );
+        }
+    }
+
+    /** @RemoteMethod(AllowInvoke=TRUE) */
+    public function carregar($usuario_id, $sistema_id)
+    {
+        $q = \Doctrine_Core::getTable("TCE\Autenticar\models\UsuarioPerfil")
+                ->createQuery("up")
+                ->select("up.id")
+                ->innerJoin("up.Perfil p")
+                ->innerJoin("p.Sistema s")
+                ->where("up.usuario_id = ?", $usuario_id)
+                ->andWhere("s.id = ?", $sistema_id);
+        if ($q->count() > 0) {
+            $usuarioPerfil = $q->execute();
+            $usuario_perfil_id = array();
+            foreach ($usuarioPerfil as $up) {
+                $usuario_perfil_id[] = $up->perfil_id;
+            }
+            $usuarioPerfil->free();
+        }
+
+        $data = array(
+            'sistema_id' => $sistema_id,
+            'usuario_id' => $usuario_id,
+            'perfis' => array(
+                'perfil_id[]' => $usuario_perfil_id
+            )
+        );
+        return array(
+            'success' => TRUE,
+            'data' => $data
+        );
+    }
+
+    /** @RemoteMethod(AllowInvoke=TRUE) */
+    public function excluir($sistema_id, $usuario_id, $perfil_id)
+    {
+        if (!is_null($sistema_id)) {
+            $q = \Doctrine_Core::getTable("TCE\Autenticar\models\UsuarioPerfil")
+                    ->createQuery("up")
+                    ->select("up.id")
+                    ->innerJoin("up.Perfil p")
+                    ->where("up.usuario_id = ?", $usuario_id)
+                    ->andWhere("up.perfil_id = ?", $perfil_id)
+                    ->andWhere("p.sistema_id = ?", $sistema_id);
+        }
+        if ($q->count() > 0) {
+            $usuarioPerfis = $q->execute();
+        }
+        foreach ($usuarioPerfis as $usuarioPerfil) {
+            \Doctrine_Core::getTable("TCE\Autenticar\models\UsuarioPerfil")
+                    ->find($usuarioPerfil->id)
+                    ->delete();
+        }
+        return array(
+            'success' => TRUE,
+            'mb' => array(
+                'title' => "Sucesso",
+                'msg' => "Removido com sucesso.",
+                'action' => $this->_minify("
+                    Ext.getCmp('Autenticar.window.UsuarioPerfil').inicializar();
+                ")
+            )
+        );
+    }
+
+    /** @RemoteMethod(AllowInvoke=TRUE) */
+    public function getPerfisPorSistema($sistema_id)
+    {
+        $this->initConnection("Autenticar");
+        $perfis = \Doctrine_Core::getTable("TCE\Autenticar\models\Perfil")
+                ->createQuery("p")
+                ->where("p.sistema_id = ?", $sistema_id)
+                ->orderBy("p.descricao")
+                ->execute()
+                ->toArray();
+        $this->array_walk_recursive_referential($perfis, "utf8_encode");
+        $data = array();
+        foreach ($perfis as $i => $perfil) {
+            $data[$i]['id'] = $perfil['id'];
+            $data[$i]['nome'] = $perfil['descricao'];
+            $data[$i]['padrao'] = $perfil['padrao'];
+        }
+        return $data;
+    }
+
+    /** @RemoteMethod(AllowInvoke=TRUE) */
+    public function getUsuariosPorPerfil($perfil_id)
+    {
+        $usuarios = \Doctrine_Core::getTable("TCE\Autenticar\models\Usuario")
+                ->createQuery("u")
+                ->select("u.id, u.nome, u.matricula")
+                ->innerJoin('u.UsuarioPerfil up')
+                ->innerJoin('up.Perfil p')
+                ->innerJoin('p.Sistema s')
+                ->where("p.id = ?", $perfil_id)
+                ->orderBy("u.nome")
+                ->execute()
+                ->toArray();
+        $this->array_walk_recursive_referential($usuarios, "utf8_encode");
+        $retorno = array();
+        foreach ($usuarios as $i => $usuario) {
+            $retorno['raiz'][$i] = array(
+                'id' => $usuario['id'],
+                'matricula' => $usuario['matricula'],
+                'nome' => $usuario['nome']
+            );
+        }
+        return $retorno;
+    }
+
+    /** @RemoteMethod(AllowInvoke=TRUE) */
+    public function getPerfisDoUsuarioPorSistema($sistema_id = NULL)
+    {
+        if (empty($sistema_id)) {
+            $sistema_id = $this->login->getUsuarioPerfil()->getSistemaPelaURL(UsuarioPerfil::RETORNO_LITERAL);
+        }
+        $cpf = $_SESSION['Autenticar']['cpf'];
+        $perfis = \Doctrine_Core::getTable("TCE\Autenticar\models\Perfil")
+                ->createQuery("p")
+                ->select("u.id, p.id, up.id, p.descricao")
+                ->innerJoin('p.UsuarioPerfil up')
+                ->innerJoin('up.Usuario u')
+                ->innerJoin('p.Sistema s')
+                ->where("u.cpf = ?", $cpf)
+                ->andWhere("s.id = ?", $sistema_id)
+                ->execute()
+                ->toArray();
+        $this->array_walk_recursive_referential($perfis, "utf8_encode");
+        $retorno = array();
+        foreach ($perfis as $i => $perfil) {
+            $retorno[$i] = [
+                'id' => $perfil['id'],
+                'descricao' => $perfil['descricao']
+            ];
+        }
+        return $retorno;
+    }
+
+    /** @RemoteMethod(AllowInvoke=TRUE) */
+    public function getSistemaPelaURL($tipoRetorno = NULL)
+    {
+        try {
+            $this->initConnection("Autenticar");
+            if (!isset($_SERVER['HTTP_REFERER'])) {
+                throw new \Champion\Exception("Não foi possivel determinar a URL de origem.");
+            }
+            $path = parse_url($_SERVER['HTTP_REFERER'], PHP_URL_PATH);
+            $q = \Doctrine_Core::getTable("TCE\Autenticar\models\Sistema")
+                    ->createQuery("s")
+                    ->where("s.url_inicial LIKE N'$path%'");
+
+            if ($q->count() > 0) {
+                $sistema = $q->execute();
+                if ($tipoRetorno == UsuarioPerfil::RETORNO_LITERAL) {
+                    $resposta = intval($sistema[0]->id);
+                } else {
+                    $resposta = array(
+                        'success' => TRUE,
+                        'data' => array(
+                            'id' => $sistema[0]->id
+                        )
+                    );
+                }
+            } else {
+                throw new \Champion\Exception("Não existe nenhum sistema associado a esta URL: " . $_SERVER['HTTP_REFERER']);
+            }
+        } catch (\Champion\Exception $exc) {
+            if ($tipoRetorno == UsuarioPerfil::RETORNO_LITERAL) {
+                $resposta = FALSE;
+            } else {
+                $resposta = array(
+                    'success' => FALSE,
+                    'msg' => $exc->getMessage()
+                );
+            }
+        } catch (\Exception $exc) {
+            if ($tipoRetorno == UsuarioPerfil::RETORNO_LITERAL) {
+                $resposta = FALSE;
+            } else {
+                $resposta = array(
+                    'success' => FALSE,
+                    'msg' => $exc->getMessage()
+                );
+            }
+        }
+        return $resposta;
+    }
+
+}

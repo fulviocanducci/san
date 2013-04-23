@@ -1,0 +1,64 @@
+<?php
+
+namespace TCE\Autenticar\models;
+
+class Servidor extends \Doctrine_Record {
+
+    public function setTableDefinition()
+    {
+        $this->setTableName('vServidor');
+        $this->hasColumn('id', 'string', 20, array(
+            'type' => 'string',
+            'length' => '20',
+            'fixed' => FALSE,
+            'unsigned' => FALSE,
+            'primary' => TRUE,
+            'autoincrement' => FALSE,
+        ));
+        $this->hasColumn('matricula', 'string', 20, array(
+            'type' => 'string',
+            'length' => '20',
+            'fixed' => FALSE,
+            'unsigned' => FALSE,
+            'notnull' => FALSE,
+            'primary' => FALSE,
+            'autoincrement' => FALSE,
+        ));
+        $this->hasColumn('nome', 'string', 160, array(
+            'type' => 'string',
+            'length' => '160',
+            'fixed' => FALSE,
+            'unsigned' => FALSE,
+            'notnull' => TRUE,
+            'primary' => FALSE,
+            'autoincrement' => FALSE,
+        ));
+        $this->hasColumn('cpf', 'string', 11, array(
+            'type' => 'string',
+            'length' => '11',
+            'fixed' => FALSE,
+            'unsigned' => FALSE,
+            'notnull' => TRUE,
+            'primary' => FALSE,
+            'autoincrement' => FALSE,
+        ));
+        $this->hasColumn('setor', 'string', 50, array(
+            'type' => 'string',
+            'length' => '50',
+            'fixed' => FALSE,
+            'unsigned' => FALSE,
+            'notnull' => TRUE,
+            'primary' => FALSE,
+            'autoincrement' => FALSE,
+        ));
+    }
+
+    public function setUp()
+    {
+        parent::setUp();
+        $this->hasOne('TCE\Autenticar\models\Usuario as Usuario', array(
+            'local' => 'id',
+            'foreign' => 'login'));
+    }
+
+}

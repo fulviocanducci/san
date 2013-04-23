@@ -1,0 +1,19 @@
+Ext.define('Autenticar.store.PerfilFormulario', {
+    extend: 'Champion.store.Base',
+    storeId: 'Autenticar.store.PerfilFormulario',
+    fields: ['perfil_id', 'formulario_id', 'formulario_descricao', 'incluir', 'alterar', 'excluir', 'acesso_externo'],
+    proxy: {
+        type: 'ajax',
+        actionMethods: {
+            create: 'POST',
+            read: 'POST',
+            update: 'POST',
+            destroy: 'POST'
+        },
+        url: TCE.Autenticar.getUrlController('PerfilFormulario', 'getFormulariosDoPerfil'),
+        reader: {
+            type: 'json',
+            root: 'raiz'
+        }
+    }
+});

@@ -1,0 +1,195 @@
+<?php
+
+namespace TCE\Autenticar\controllers;
+
+/**
+ * TCE\Autenticar\controllers\PerfilFormulario.php
+ * 
+ * Controla as requisições para a associação
+ * de formulários à um perfil.
+ * @author Leonardo Sales <leonardojs@tce.to.gov.br>
+ * @version 1.0
+ * @package Autenticar
+ */
+
+/**
+ * The first example class, this is in the same package as the
+ * procedural stuff in the start of the file
+ * @package Autenticar
+ * @subpackage controllers
+ * @RemoteClass
+ */
+class PerfilFormulario extends \Champion\Controller {
+//
+//    public function __construct()
+//    {
+//        parent::__construct();
+//        $this->login = new \TCE\Autenticar\controllers\Login();
+//    }
+
+    /**
+     * Retorna um json com todos os formulários associados
+     * a um determinado Perfil
+     * @param integer $perfil_id
+     * @return array
+     * @RemoteMethod 
+     */
+    public function getFormulariosDoPerfil($perfil_id = NULL)
+    {
+//        if ($this->login->isAuth()) {
+            $formularios = \Doctrine_Core::getTable("TCE\Autenticar\models\PerfilFormulario")
+                    ->createQuery("pf")
+                    ->select("f.descricao, pf.*")
+                    ->innerJoin("pf.Formulario f")
+                    ->where("pf.perfil_id = ?", $perfil_id)
+                    ->execute()
+                    ->toArray();
+            //echo $formularios->getSqlQuery();
+            $this->array_walk_recursive_referential($formularios, "utf8_encode");
+            $saida = array();
+            foreach ($formularios as $i => $form) {
+                $saida[$i]['id'] = $form['id'];
+                $saida[$i]['perfil_id'] = $form['perfil_id'];
+                $saida[$i]['formulario_id'] = $form['formulario_id'];
+                $saida[$i]['formulario_descricao'] = $form['Formulario']['descricao'];
+                $saida[$i]['incluir'] = $form['incluir'];
+                $saida[$i]['alterar'] = $form['alterar'];
+                $saida[$i]['excluir'] = $form['excluir'];
+                $saida[$i]['acesso_externo'] = $form['acesso_externo'];
+            }
+            return array(
+                'raiz' => $saida
+            );
+//        }
+    }
+
+    /**
+     * Altera uma permissão de um Formuláro para um determinado
+     * Perfil
+     * @param integer $id id de PerfilFormulario
+     * @param string $campo nome do campo que vai ser alterado
+     * @param integer $valor valor que irá ser aplicado ao $campo
+     * @return boolean
+     * @RemoteMethod 
+     */
+    public function setPermissao($id, $campo, $valor)
+    {
+//        if ($this->login->isAuth()) {
+            $q = \Doctrine_Core::getTable("TCE\Autenticar\models\PerfilFormulario")
+                    ->createQuery("pf")
+                    ->update()
+                    ->set("pf.$campo", intval($valor))
+                    ->where("pf.id = ?", $id)
+                    ->execute();
+            return $q ? TRUE : FALSE;
+//        }
+    }
+
+    /**
+     * Altera o perfil padrão que será atribuido quando um
+     * novo Usuário for associado a um Sistema
+     * @param integer $perfil_id id de Perfil
+     * @return boolean
+     * @RemoteMethod 
+     */
+    public function setPerfilPadrao($perfil_id)
+    {
+//        if ($this->login->isAuth()) {
+            $q = \Doctrine_Core::getTable("TCE\Autenticar\models\Perfil")
+                    ->find($perfil_id);
+            if ($q->count() > 0) {
+                $perfis = \Doctrine_Core::getTable("TCE\Autenticar\models\Perfil")
+                        ->createQuery("p")
+                        ->where("p.sistema_id = ?", $q->sistema_id)
+                        ->execute();
+                foreach ($perfis as $perfil) {
+                    if ($perfil_id == $perfil->id) {
+                        $q1 = \Doctrine_Core::getTable("TCE\Autenticar\models\Perfil")
+                                ->createQuery("p")
+                                ->update()
+                                ->set("p.padrao", 1)
+                                ->where("p.id = ?", $perfil->id);
+                    } else {
+                        $q1 = \Doctrine_Core::getTable("TCE\Autenticar\models\Perfil")
+                                ->createQuery("p")
+                                ->update()
+                                ->set("p.padrao", 0)
+                                ->where("p.id = ?", $perfil->id);
+                    }
+                    $q1->execute();
+                }
+            }
+            return TRUE;
+//        }
+    }
+
+    /**
+     * Cria uma associação de um Perfil para 
+     * vários Formulários com todas a permissões negadas
+     * @param integer $perfil_id id de Perfil
+     * @param array $formulario_ids id's de Formulario
+     * @return HTML_AJAX_Action
+     * @RemoteMethod 
+     */
+    public function adicionarPermissao($perfil_id, $formulario_ids)
+    {
+//        if ($this->login->isAuth()) {
+            try {
+                if (is_array($formulario_ids)) {
+                    foreach ($formulario_ids as $formulario_id) {
+                        $perfilFormulario = new \TCE\Autenticar\models\PerfilFormulario();
+                        $perfilFormulario->perfil_id = $perfil_id;
+                        $perfilFormulario->formulario_id = $formulario_id;
+                        $perfilFormulario->save();
+                    }
+                }
+                $resposta = array(
+                    'success' => true,
+                    'msg' => "Formulário associado com sucesso!"
+                );
+            } catch (\Exception $exc) {
+                $resposta = array(
+                    'success' => false,
+                    'msg' => $exc->getMessage()
+                );
+            }
+
+            return $resposta;
+//        }
+    }
+
+    /**
+     * Remove uma associação de um Perfil para 
+     * vários Formulários com todas a permissões negadas
+     * @param integer $perfil_id id de Perfil
+     * @param array $formulario_ids id's de Formulario
+     * @return HTML_AJAX_Action
+     * @RemoteMethod 
+     */
+    public function removerPermissao($perfil_formulario_ids)
+    {
+//        if ($this->login->isAuth()) {
+            try {
+                if (is_array($perfil_formulario_ids)) {
+                    foreach ($perfil_formulario_ids as $perfil_formulario_id) {
+                        \Doctrine_Core::getTable("TCE\Autenticar\models\PerfilFormulario")
+                                ->find($perfil_formulario_id)
+                                ->delete();
+                    }
+                }
+                $resposta = array(
+                    'success' => true,
+                    'msg' => "Formulário(s) desassociado(s) com sucesso!"
+                );
+            } catch (\Exception $exc) {
+                $resposta = array(
+                    'success' => false,
+                    'msg' => $exc->getMessage()
+                );
+            }
+
+            return $resposta;
+//        }
+    }
+
+}

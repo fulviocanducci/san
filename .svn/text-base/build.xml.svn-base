@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project name="Champion" default="build">
+    <property name="source" value="app"/>
+    <property name="basedir" value="."/>
+
+    <target name="clean"
+            description="Clean up and create artifact directories">
+        <delete dir="${basedir}/build/api"/>
+        <delete dir="${basedir}/build/code-browser"/>
+        <delete dir="${basedir}/build/coverage"/>
+        <delete dir="${basedir}/build/logs"/>
+        <delete dir="${basedir}/build/pdepend"/>
+
+        <mkdir dir="${basedir}/build/scripts"/>
+        <mkdir dir="${basedir}/build/db/"/>
+        <mkdir dir="${basedir}/build/db/delta"/>
+        <mkdir dir="${basedir}/build/api"/>
+        <mkdir dir="${basedir}/build/code-browser"/>
+        <mkdir dir="${basedir}/build/coverage"/>
+        <mkdir dir="${basedir}/build/logs"/>
+        <mkdir dir="${basedir}/build/pdepend"/>
+    </target>
+
+    <target name="phplint">
+        <apply executable="php" failonerror="true">
+            <arg value="-l" />
+
+            <fileset dir="${basedir}/app">
+                <include name="**/*.php" />
+                <modified />
+            </fileset>
+
+            <fileset dir="${basedir}/tests">
+                <include name="**/*.php" />
+                <modified />
+            </fileset>
+        </apply>
+    </target>
+    <target name="phpunit">
+        <exec executable="phpunit" dir="${basedir}/tests/">
+            <arg line=" --bootstrap='${basedir}/cli-config.php' --log-junit '${basedir}/build/logs/phpunit.xml' --coverage-html '${basedir}/build/coverage' --coverage-clover '${basedir}/build/logs/clover.xml' --configuration='${basedir}/tests/phpunit.xml' --stop-on-error" />
+        </exec>
+    </target>
+
+    <target name="pdepend"
+            description="Generate jdepend.xml and software metrics charts using PHP_Depend">
+        <exec executable="pdepend">
+            <arg value="--jdepend-xml=${basedir}/build/logs/jdepend.xml" />
+            <arg value="--jdepend-chart=${basedir}/build/pdepend/dependencies.svg" />
+            <arg value="--overview-pyramid=${basedir}/build/pdepend/overview-pyramid.svg" />
+            <arg path="${source}" />
+        </exec>
+    </target>
+
+    <target name="phpmd"
+            description="Perform project mess detection using PHPMD and print human readable output. Intended for usage on the command line before committing.">
+        <exec executable="phpmd">
+            <arg path="${source}" />
+            <arg value="xml" />
+            <arg value="${basedir}/app/conf/phpmd.xml" />
+            <arg value="--reportfile" />
+            <arg value="${basedir}/build/logs/pmd.xml" />
+        </exec>
+    </target>
+
+    <target name="phpcpd"
+            description="Generate pmd-cpd.xml using PHPCPD">
+        <exec executable="phpcpd">
+            <arg value="--log-pmd" />
+            <arg value="${basedir}/build/logs/pmd-cpd.xml" />
+            <arg path="${source}" />
+        </exec>
+    </target>
+
+    <target name="phploc"
+            description="Generate phploc.csv">
+        <exec executable="phploc">
+            <arg value="--log-csv" />
+            <arg value="${basedir}/build/logs/phploc.csv" />
+            <arg path="${source}" />
+        </exec>
+    </target>
+
+    <target name="phpcs"
+            description="Generate checkstyle.xml using PHP_CodeSniffer">
+        <exec executable="phpcs" output="${basedir}/build/logs/checkstyle.xml">
+            <arg value="--report=checkstyle"/>
+            <arg value="--standard=${basedir}/app/conf/phpcs.xml" />
+            <arg value="--extensions=php,js" />
+            <arg path="${source}" />
+        </exec>
+    </target>
+
+    <target name="apigen"
+            description="Generate API documentation using ApiGen">
+        <exec executable="apigen">
+            <arg value="--source" />
+            <arg path="${source}" />
+            <arg value="--destination" />
+            <arg path="${basedir}/build/api" />
+            <arg value="--template-config" />
+            <arg path="/usr/share/php/data/ApiGen/templates/bootstrap/config.neon" />
+        </exec>
+    </target>
+
+    <target name="phpcb"
+            description="Aggregate tool output with PHP_CodeBrowser">
+        <exec executable="phpcb">
+            <arg value="--log" />
+            <arg path="${basedir}/build/logs" />
+            <arg value="--source" />
+            <arg path="${source}" />
+            <arg value="--output" />
+            <arg path="${basedir}/build/code-browser" />
+        </exec>
+    </target>
+
+    <target name="jslint" description="Run the JSLint tool on JS files">
+        <fileset dir="./app/views" id="jsfiles.raw">
+            <include name="**/*.js" />
+            <exclude name="**/*.min.js" />
+        </fileset>
+        <pathconvert pathsep=" " property="jsfiles.clean" refid="jsfiles.raw" />
+        <exec executable="java">
+            <arg line="-jar /home/ljs/closurecompiler.jar --warning_level VERBOSE --summary_detail_level 3 --compilation_level WHITESPACE_ONLY --js ${jsfiles.clean} --js_output_file /dev/null" />
+        </exec>
+    </target>
+    <target name="build" depends="clean,phpunit,phplint,jslint,pdepend,phpcpd,phpmd,phpcs,phploc,apigen"/>
+
+</project>

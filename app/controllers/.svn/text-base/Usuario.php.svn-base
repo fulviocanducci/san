@@ -1,0 +1,134 @@
+<?php
+
+namespace TCE\Autenticar\controllers;
+
+/** @RemoteClass */
+class Usuario extends \Champion\Controller {
+
+    public function __construct()
+    {
+        parent::__construct();
+        $this->login = new \TCE\Autenticar\controllers\Login();
+    }
+
+    /** @RemoteMethod(AllowInvoke=TRUE) */
+    public function salvar($sistema_id, $perfil_id, $usuario_id)
+    {
+        if ($this->login->isAuth()) {
+            $this->initConnection("Autenticar");
+            try {
+                $usuarioPerfil = new \TCE\Autenticar\models\UsuarioPerfil();
+                $usuarioPerfil->usuario_id = $usuario_id;
+                $usuarioPerfil->perfil_id = $perfil_id;
+                $usuarioPerfil->save();
+                $resposta = array(
+                    'success' => TRUE,
+                    'msg' => "Usuário associado com sucesso"
+                );
+            } catch (\Champion\Exception $exc) {
+                $resposta = array(
+                    'success' => FALSE,
+                    'msg' => $exc->getMessage()
+                );
+            }
+            return $resposta;
+        }
+    }
+
+    /** @RemoteMethod(AllowInvoke=TRUE) */
+    public function excluir($id)
+    {
+        if ($this->login->isAuth()) {
+            try {
+                if (!is_null($id)) {
+                    $usuario = \Doctrine_Core::getTable("TCE\Autenticar\models\Usuario")
+                            ->find($id)
+                            ->delete();
+                }
+                if ($usuario) {
+                    return array(
+                        'success' => TRUE,
+                        'msg' => "Usuário removido do perfil."
+                    );
+                }
+            } catch (\Champion\Exception $exc) {
+                $resposta = array(
+                    'success' => FALSE,
+                    'msg' => $exc->getMessage()
+                );
+            }
+            return $resposta;
+        }
+    }
+
+    /** @RemoteMethod(AllowInvoke=TRUE) */
+    public function getUsuarioPorNome()
+    {
+        if ($this->login->isAuth()) {
+            try {
+                $this->array_walk_recursive_referential($_POST, "utf8_encode");
+                $query = str_replace(" ", "%", trim($_POST['query']));
+                $usuario = \Doctrine_Core::getTable("TCE\Autenticar\models\Usuario")
+                        ->createQuery("u")
+                        ->where("u.nome LIKE '%$query%'")
+                        ->execute()
+                        ->toArray();
+                $this->array_walk_recursive_referential($usuario, "utf8_encode");
+                return $usuario;
+            } catch (\Champion\Exception $exc) {
+                echo $exc->getMessage();
+            }
+        }
+    }
+
+    public function getUsuarioPorCpf($cpf)
+    {
+        try {
+            if (!empty($cpf)) {
+                $usuario = \Doctrine_Core::getTable("TCE\Autenticar\models\Usuario")
+                        ->createQuery("u")
+                        ->where("u.cpf = ?", $cpf)
+                        ->execute();
+
+                return [
+                    'success' => TRUE,
+                    'data' => [
+                        'id' => $usuario[0]->id,
+                        'nome' => $usuario[0]->nome,
+                        'cpf' => $usuario[0]->cpf
+                    ]
+                ];
+            } else {
+                throw new \Champion\Exception("Usuário não definido!");
+            }
+        } catch (\Champion\Exception $exc) {
+            return [
+                'success' => FALSE,
+                'msg' => $exc->getMessage()
+            ];
+        }
+    }
+
+    public function existe($cpf)
+    {
+        try {
+            $this->initConnection("Autenticar");
+            if (!empty($cpf)) {
+                $usuario = \Doctrine_Core::getTable("TCE\Autenticar\models\Usuario")
+                        ->createQuery("u")
+                        ->where("u.cpf = ?", $cpf)
+                        ->execute();
+                if (count($usuario) > 0) {
+                    return TRUE;
+                } else {
+                    return FALSE;
+                }
+            } else {
+                throw new \Champion\Exception("Usuário não definido!");
+            }
+        } catch (\Champion\Exception $exc) {
+            return FALSE;
+        }
+    }
+
+}

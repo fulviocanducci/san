@@ -1,0 +1,120 @@
+<?php
+
+namespace TCE;
+
+/**
+ * TCE\Autenticar\controllers\Autenticar.php
+ * 
+ * Classe padrão para criação de um aplicativo.
+ * @author Leonardo Sales <leonardojs@tce.to.gov.br>
+ * @version 1.0
+ * @package Autenticar
+ */
+
+/**
+ * Classe que implementa ações referente a um
+ * aplicativo.
+ * @package Autenticar
+ * @subpackage controllers
+ * @RemoteClass
+ */
+class Autenticar extends \Champion\App {
+
+    /**
+     * Armazena o namespace javascript do aplicativo atual
+     * @var string
+     * @example TCE.Autenticar
+     */
+    public $appNamespace;
+
+    /**
+     * Instância do controller Login
+     * @var TCE\Autenticat\controllers\Login
+     */
+    protected $login;
+
+    /**
+     * Construtor
+     */
+    public function __construct()
+    {
+        $this->appNamespace = str_ireplace("\\", ".", __CLASS__);
+        $this->login = new \TCE\Autenticar\controllers\Login();
+        parent::__construct();
+    }
+
+    /**
+     * Realiza interações iniciais referentes ao aplicativo
+     * atual. Essas ações geralmente resultarão em ações 
+     * javascript.
+     * @return HTML_AJAX_Action
+     * @RemoteMethod
+     * @Index
+     */
+    public function index()
+    {
+        try {
+            parent::index();
+            if ($this->login->isAuth()) {
+                $sistema_id = $this->login->getUsuarioPerfil()->getSistemaPelaURL();
+                if ($sistema_id['success']) {
+                    if ($this->login->_usuarioTemPermissaoNoSistema()) {
+                        if ($this->login->temPerfil(NULL, ["Administrador", "Desenvolvedor"])) {
+                            $this->response->insertScript($this->_minify("
+                                Ext.getCmp('menuPrincipal').add([
+                                   {
+                                      text: 'Sistema',
+                                      iconCls: 'silk-application',
+                                      handler: function() {
+                                         TCE.Autenticar.exibirFormulario('Autenticar.form.Sistema', true);
+                                      }
+                                   },
+                                   {
+                                      text: 'Sair',
+                                      iconCls: 'silk-door-out',
+                                      handler: function() {
+                                         TCE.Autenticar.encerrar();
+                                      }
+                                   },
+                                   '->',
+                                   " . $this->getBotaoInformacaoesUsuario() . "
+                                   ]
+                                );
+                           "));
+                        }
+                    } else {
+                        throw new \Champion\Exception("Você não tem permissão para acessar este sistema.");
+                    }
+                } else {
+                    throw new \Champion\Exception($sistema_id['msg']);
+                }
+            }
+        } catch (\Champion\Exception $exc) {
+            $this->response->insertScript($this->_minify("
+                Ext.getCmp('menuPrincipal').add([{
+                    text:'Sair',
+                    iconCls: 'silk-door-out',
+                    handler: function() {
+                       " . $this->appNamespace . ".encerrar();
+                    }
+                },
+                '->',
+                " . $this->getBotaoInformacaoesUsuario() . "
+                ]);
+                Ext.Msg.show({
+                    closable: false,
+                    modal: true,
+                    title: 'Falha de acesso',
+                    icon: Ext.Msg.ERROR,
+                    msg: '" . $exc->getMessage() . "',
+                    buttons: Ext.Msg.OK,
+                    fn: function() {
+                        Ext.getCmp('menuSistemas').expand();
+                    }
+                });
+            "));
+        }
+        return $this->response;
+    }
+
+}

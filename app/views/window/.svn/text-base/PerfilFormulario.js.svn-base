@@ -1,0 +1,60 @@
+Ext.define('Autenticar.window.PerfilFormulario', {
+    extend: 'Autenticar.window.ui.PerfilFormulario',
+    constructor: function() {
+        var me = this;
+        me.storePerfil = Ext.create('Autenticar.store.Perfil');
+        me.storeFormulario = Ext.create('Autenticar.store.Formulario');
+        me.storePerfilFormulario = Ext.create('Autenticar.store.PerfilFormulario');
+        me.callParent(arguments);
+    },
+    inicializar: function() {
+        this.perfil_id = "";
+        this.resetarGridPerfis();
+        this.resetarGridFormularios();
+        this.resetarGridPerfiFormulario();
+        this.getBotaoAdicionarPermissao().disable();
+        this.getBotaoRemoverPermissao().disable();
+    },
+    resetarGridPerfis: function() {
+        this.getBotaoEditarPerfil().disable();
+        //this.getBotaoExcluirPerfil().disable();
+        this.storePerfil.load({
+            params: {
+                sistema_id: this.sistema_id
+            }
+        });
+    },
+    resetarGridFormularios: function() {
+        this.getBotaoEditarFormulario().disable();
+        //this.getBotaoExcluirFormulario().disable();
+        this.getCheckboxFormulariosAssociados().setValue(false);
+        this.getCheckboxFormulariosNaoAssociados().setValue(false);
+        this.getBotaoAdicionarPermissao().disable();
+        this.storeFormulario.load({
+            params: {
+                sistema_id: this.sistema_id,
+                perfil_id: this.perfil_id
+            },
+            callback: function(records, operation, success) {
+                this.getBarraStatus().clearStatus(); 
+            },
+            scope: this
+        });
+    },
+    resetarGridPerfiFormulario: function() {
+        if (!Ext.isEmpty(this.perfil_id)) {
+            this.storePerfilFormulario.load({
+                params: {
+                    perfil_id: this.perfil_id
+                }
+            });
+        } else {
+            this.storePerfilFormulario.removeAll();
+        }
+    },
+    listeners: {
+        afterrender: function() {
+            this.inicializar();
+        }
+    }
+});

@@ -1,0 +1,133 @@
+Ext.define('Autenticar.window.ui.Perfil', {
+    extend: 'Champion.window.Base',
+    id: 'Autenticar.window.Perfil',
+    layout: 'fit',
+    height: 130,
+    width: 400,
+    title: 'Criação/Modificação de Perfil',
+    modal: true,
+    resizable: false,
+    initComponent: function() {
+        var me = this;
+        Ext.applyIf(me, {
+            items: [
+            {
+                xtype: 'form',
+                layout: 'anchor',
+                bodyPadding: 10,
+                defaults: {
+                    anchor: '100%'
+                },
+                border: false,
+                items: [
+                {
+                    xtype: 'hidden',
+                    name: 'id'
+                },
+                {
+                    xtype: 'hidden',
+                    name: 'sistema_id',
+                    value: this.sistema_id
+                },
+                {
+                    xtype: 'textfield',
+                    fieldLabel: 'Descrição',
+                    labelWidth: 90,
+                    name: 'descricao',
+                    allowBlank: false
+                }
+                ]
+            }
+            ],
+            buttons: [
+            this.getBotaoSalvar(),
+            this.getBotaoExcluir(),
+            {
+                text: 'Fechar',
+                iconCls: 'silk-cross',
+                handler: function() {
+                    this.close();
+                },
+                scope: this
+            }
+            ]
+        });
+        me.callParent(arguments);
+    },
+    getWindowPerfilFormulario: function() {
+        return this.windowPerfilFormulario;
+    },
+    getBotaoSalvar: function() {
+        if (!this.botaoSalvar) {
+            this.botaoSalvar = Ext.widget('button', {
+                text: 'Salvar',
+                iconCls: 'silk-disk',
+                formBind: true,
+                handler: function() {
+                    var form = this.down('form').getForm();
+                    if (form.isValid()) {
+                        form.submit({
+                            url: TCE.Autenticar.getUrlController('Perfil', 'salvar'),
+                            success: function(form, action) {
+                                var response = action.result;
+                                this.getWindowPerfilFormulario().inicializar();
+                                this.getWindowPerfilFormulario().getBarraStatus().setStatus({
+                                    text: response.msg,
+                                    iconCls: 'x-status-valid',
+                                    clear: true
+                                });
+                                this.close();
+                            },
+                            failure: function(form, action) {
+                                this.getWindowUsuarioPerfil().getBarraStatus().setStatus({
+                                    text: response.msg,
+                                    iconCls: 'x-status-error',
+                                    clear: true
+                                });
+                                this.close();
+                            },
+                            scope: this
+                        });
+                    }
+                },
+                scope: this
+            });
+        }
+        return this.botaoSalvar;
+    },
+    getBotaoExcluir: function() {
+        if (!this.botaoExcluir) {
+            this.botaoExcluir = Ext.widget('button', {
+                text: 'Excluir',
+                iconCls: 'silk-delete',
+                handler: function() {
+                    Ext.Msg.show({
+                        title: 'Confirmação de exclusão',
+                        msg: 'Deseja realmente excluir este perfil?',
+                        buttons: Ext.Msg.YESNO,
+                        icon: Ext.Msg.QUESTION,
+                        fn: function(resp) {
+                            if (resp == 'yes') {
+                                this.getWindowPerfilFormulario().storePerfil.remove(this.getWindowPerfilFormulario().getGridPerfis().getSelectionModel().getSelection());
+                                this.getWindowPerfilFormulario().storePerfil.sync({
+                                    success: function(batch, options) {
+                                        this.inicializar();
+                                        this.getWindowPerfilFormulario().getBarraStatus().setStatus({
+                                            text: "Perfil excluído com sucesso!",
+                                            iconCls: 'x-status-valid',
+                                            clear: true
+                                        });
+                                    },
+                                    scope: this
+                                });
+                            }
+                        },
+                        scope: this
+                    });
+                },
+                scope: this
+            });
+        }
+        return this.botaoExcluir;
+    }
+});

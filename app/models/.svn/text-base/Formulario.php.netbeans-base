@@ -1,0 +1,73 @@
+<?php
+
+namespace TCE\Autenticar\models;
+
+/**
+ * Formulario
+ * 
+ * @property integer $id
+ * @property integer $sistema_id
+ * @property string $nome
+ * @property string $descricao
+ * @property Doctrine_Collection $Documento
+ * 
+ * @package    TCE.Autenticar
+ * @subpackage models
+ * @author     Leonardo Sales <leonardojs@tce.to.gov.br>
+ * @version    1.0
+ */
+class Formulario extends \Doctrine_Record {
+
+    public function setTableDefinition()
+    {
+        $this->setTableName('Formulario');
+        $this->hasColumn('id', 'integer', 4, array(
+            'type' => 'integer',
+            'length' => '4',
+            'fixed' => FALSE,
+            'unsigned' => FALSE,
+            'primary' => TRUE,
+            'autoincrement' => TRUE,
+        ));
+        $this->hasColumn('sistema_id', 'integer', 4, array(
+            'type' => 'integer',
+            'length' => '4',
+            'fixed' => FALSE,
+            'unsigned' => FALSE,
+            'notnull' => FALSE,
+            'primary' => FALSE,
+            'autoincrement' => FALSE,
+        ));
+        $this->hasColumn('nome', 'string', 100, array(
+            'type' => 'string',
+            'length' => '100',
+            'fixed' => FALSE,
+            'unsigned' => FALSE,
+            'notnull' => TRUE,
+            'primary' => FALSE,
+            'autoincrement' => FALSE,
+        ));
+        $this->hasColumn('descricao', 'string', 100, array(
+            'type' => 'string',
+            'length' => '100',
+            'fixed' => FALSE,
+            'unsigned' => FALSE,
+            'notnull' => TRUE,
+            'primary' => FALSE,
+            'autoincrement' => FALSE,
+        ));
+    }
+
+    public function setUp()
+    {
+        parent::setUp();
+        $this->hasOne('TCE\Autenticar\models\Sistema as Sistema', array(
+            'local' => 'sistema_id',
+            'foreign' => 'id'));
+
+        $this->hasMany('TCE\Autenticar\models\PerfilFormulario as PerfilFormulario', array(
+            'local' => 'id',
+            'foreign' => 'formulario_id'));
+    }
+
+}

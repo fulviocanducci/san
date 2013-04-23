@@ -1,0 +1,527 @@
+<?php
+
+namespace TCE\Autenticar\controllers;
+
+use TCE\Autenticar\classes as Autenticar;
+
+session_start();
+
+/** @RemoteClass */
+class Login extends \Champion\Controller implements \Champion\iLogin {
+
+    protected $usuarioPerfil;
+
+    public function __construct()
+    {
+        parent::__construct();
+        $this->usuarioPerfil = new \TCE\Autenticar\controllers\UsuarioPerfil();
+    }
+
+    /**
+     * @RemoteMethod(AllowInvoke=TRUE)
+     */
+    public function doAuth($user, $password)
+    {
+        try {
+            if ($this->ehCpf($user)) {
+                $q = \Doctrine_Core::getTable("TCE\Autenticar\models\Usuario")
+                        ->createQuery("u")
+                        ->where("u.cpf = ?", $user)
+                        ->andWhere("u.senha = ?", md5($password));
+                if ($q->count() > 0) {
+                    $this->build_session_externo($user);
+                    $this->atualizar_externo($user);
+                    $response = array(
+                        'success' => TRUE,
+                        'mb' => array(
+                            'title' => "Sucesso na autenticação",
+                            'msg' => "Seja bem-vindo, $user.",
+                            'SQL' => $this->getSqlProfiler()
+                        )
+                    );
+                } else {
+                    throw new Autenticar\Exception("Usuário/senha incorreto.");
+                }
+            } else {
+                if ($this->userInActiveDirectory($user, $password)) {
+                    $sistema = $this->usuarioPerfil->getSistemaPelaURL();
+                    if ($sistema['success'] AND $this->usuarioTemPermissaoNoSistema($_SESSION["Autenticar"]['cpf'], $sistema['data']['id'])) {
+                        $response = array(
+                            'success' => TRUE,
+                            'mb' => array(
+                                'title' => "Sucesso na autenticação",
+                                'msg' => "Seja bem-vindo, $user."
+                            )
+                        );
+                    } else {
+                        throw new Autenticar\Exception("Usuário não possui acesso a este sistema.");
+                    }
+                } else {
+                    throw new Autenticar\Exception("Usuário/senha incorreto.");
+                }
+            }
+        } catch (Autenticar\Exception $e) {
+            $response = array(
+                'success' => FALSE,
+                'usuario' => $user,
+                'mb' => array(
+                    'title' => "Falha na autenticação",
+                    'msg' => $e->getMessage()
+                )
+            );
+        }
+        return $response;
+    }
+
+    /** @RemoteMethod */
+    public function killAuth()
+    {
+        unset($_SESSION['Autenticar']);
+    }
+
+    /** @RemoteMethod */
+    public function isAuth()
+    {
+        return isset($_SESSION['Autenticar']);
+    }
+
+    /** @RemoteMethod */
+    public function usuarioTemPermissaoNoSistema($cpf, $sistema_id)
+    {
+        $this->initConnection("Autenticar");
+        $q = \Doctrine_Core::getTable("TCE\Autenticar\models\Usuario")
+                ->createQuery("u")
+                ->select("u.id")
+                ->innerJoin('u.UsuarioPerfil up')
+                ->innerJoin('up.Perfil p')
+                ->innerJoin('p.Sistema i')
+                ->where("i.id = ?", intval($sistema_id))
+                ->andWhere("u.cpf = ?", $cpf);
+        if ($q->count() > 0) {
+            $resposta = TRUE;
+        } else {
+            $resposta = FALSE;
+        }
+        return $resposta;
+    }
+
+    public function _usuarioTemPermissaoNoSistema()
+    {
+        $cpf = $_SESSION['Autenticar']['cpf'];
+        $sistema_id = $this->getUsuarioPerfil()->getSistemaPelaURL(UsuarioPerfil::RETORNO_LITERAL);
+        $this->initConnection("Autenticar");
+        $q = \Doctrine_Core::getTable("TCE\Autenticar\models\Usuario")
+                ->createQuery("u")
+                ->select("u.id")
+                ->innerJoin('u.UsuarioPerfil up')
+                ->innerJoin('up.Perfil p')
+                ->innerJoin('p.Sistema i')
+                ->where("i.id = ?", intval($sistema_id))
+                ->andWhere("u.cpf = ?", $cpf);
+        if ($q->count() > 0) {
+            $resposta = TRUE;
+        } else {
+            $resposta = FALSE;
+        }
+        return $resposta;
+    }
+
+    private function userInActiveDirectory($usuario, $senha)
+    {
+//        try {
+        $usuario = trim(strtolower($usuario));
+        $ldap_server = "ldap://" . \Champion::LDAP_SERVER;
+        $auth_user = "tce-to\\$usuario";
+        $auth_pass = "$senha";
+        $base_dn = "OU=Pessoas,DC=tce-to,DC=tce,DC=to,DC=gov,DC=br";
+        $filter = "(&(objectClass=user)(samaccountname=*$usuario*))";
+        if (($connect = @\ldap_connect($ldap_server))) {
+            if ((@\ldap_bind($connect, $auth_user, $auth_pass))) {
+                if (($search = \ldap_search($connect, $base_dn, $filter))) {
+                    switch ($this->getConfigurator()->getVersaoDoctrine()) {
+                        default:
+                        case "1.2":
+                            $q = \Doctrine_Core::getTable("TCE\Autenticar\models\Usuario")
+                                    ->findByLogin($usuario);
+                            break;
+                        case "2.0":
+                        case "2.1":
+                            break;
+                    }
+                    if (count($q) > 0) {
+                        $this->build_session($usuario);
+                        $this->atualizar($usuario, $senha);
+                    } else {
+                        $this->cadastrar($usuario, $senha);
+                        $this->build_session($usuario);
+                    }
+                    return TRUE;
+                } else {
+                    return FALSE;
+                }
+            } else {
+                $senhaMd5 = md5($senha);
+                $q = \Doctrine_Core::getTable("TCE\Autenticar\models\Usuario")
+                        ->createQuery("u")
+                        ->where("u.login = ?", $usuario)
+                        ->andWhere("u.senha = ?", $senhaMd5);
+                if ($q->count() > 0) {
+                    $this->build_session($usuario);
+                    $this->atualizar($usuario, $senha);
+                    return TRUE;
+                }
+                return FALSE;
+            }
+        }
+    }
+
+    private function atualizar($usuario, $senha)
+    {
+        switch ($this->getConfigurator()->getVersaoDoctrine()) {
+            default:
+            case "1.2":
+                $servidor = \Doctrine_Core::getTable("TCE\Autenticar\models\Servidor")
+                        ->find($usuario);
+                if (!empty($servidor->Usuario->id)) {
+                    $servidor->Usuario->senha = md5($senha);
+                    $servidor->Usuario->ultimo_acesso = date("Y-m-d H:i:s");
+                    $servidor->Usuario->cpf = $servidor->cpf;
+                    $servidor->save();
+                }
+                break;
+            case "2.0":
+            case "2.1":
+                break;
+        }
+    }
+
+    private function atualizar_externo($cpf)
+    {
+        switch ($this->getConfigurator()->getVersaoDoctrine()) {
+            default:
+            case "1.2":
+                $usuario = \Doctrine_Core::getTable("TCE\Autenticar\models\Usuario")
+                        ->findByCpf($cpf);
+                $usuario[0]->ultimo_acesso = date("Y-m-d H:i:s");
+                $usuario->save();
+                break;
+            case "2.0":
+            case "2.1":
+                break;
+        }
+    }
+
+    private function cadastrar($usuario, $senha)
+    {
+        switch ($this->getConfigurator()->getVersaoDoctrine()) {
+            default:
+            case "1.2":
+                $servidor = \Doctrine_Core::getTable("TCE\Autenticar\models\Servidor")
+                        ->find($usuario);
+                if ($servidor !== false) {
+                    $nome = $servidor->nome;
+                    $matricula = $servidor->matricula;
+                    $cpf = $servidor->cpf;
+
+                    $servidor->Usuario->nome = $nome;
+                    $servidor->Usuario->cpf = $cpf;
+                    $servidor->Usuario->matricula = $matricula;
+                    $servidor->Usuario->login = $usuario;
+                    $servidor->Usuario->senha = md5($senha);
+                    $servidor->Usuario->ultimo_acesso = date("Y-m-d H:i:s");
+                    $servidor->save();
+                } else {
+                    throw new \Champion\Exception("Usuário não encontrado na folha de pagamento.");
+                }
+                break;
+            case "2.0":
+            case "2.1":
+                break;
+        }
+    }
+
+    /**
+     * @RemoteMethod(AllowInvoke=TRUE)
+     */
+    public function cadastrar_externo($cpf, $nome)
+    {
+        switch ($this->getConfigurator()->getVersaoDoctrine()) {
+            default:
+            case "1.2":
+                $cpf = trim($cpf);
+                $nome = trim($nome);
+                $servidor = \Doctrine_Core::getTable("TCE\Autenticar\models\Servidor")
+                        ->findByCpf($cpf);
+                $usuario = new \TCE\Autenticar\models\Usuario();
+                $usuario->nome = utf8_decode($nome);
+                $usuario->cpf = $cpf;
+                $usuario->matricula = ($servidor !== FALSE ? $servidor[0]->matricula : NULL);
+                $usuario->login = ($servidor !== FALSE ? $servidor[0]->id : NULL);
+                $usuario->senha = NULL;
+                $usuario->ultimo_acesso = date("Y-m-d H:i:s");
+                $sistema_id = $this->getUsuarioPerfil()->getSistemaPelaURL(UsuarioPerfil::RETORNO_LITERAL);
+                $this->initConnection('Autenticar');
+                $perfil = \Doctrine_Core::getTable("TCE\Autenticar\models\Perfil")
+                                ->createQuery('p')
+                                ->where('p.sistema_id = ?', $sistema_id)
+                                ->andWhere('p.padrao = 1')->execute();
+                if ($perfil !== FALSE) {
+                    $usuario->UsuarioPerfil[0]->perfil_id = $perfil[0]->id;
+                }
+                $usuario->save();
+                break;
+            case "2.0":
+            case "2.1":
+                break;
+        }
+    }
+
+    private function build_session($user)
+    {
+        $q = \Doctrine_Core::getTable("TCE\Autenticar\models\Servidor")
+                ->createQuery("s")
+                ->innerJoin("s.Usuario u")
+                ->where("s.id = ?", $user);
+        if ($q->count() > 0) {
+            $servidor = $q->execute();
+            $_SESSION["Autenticar"]['usuario'] = $user;
+            $_SESSION["Autenticar"]['nome'] = $servidor[0]->nome;
+            $_SESSION["Autenticar"]['matricula'] = $servidor[0]->matricula;
+            $_SESSION["Autenticar"]['cpf'] = $servidor[0]->cpf;
+            $_SESSION["Autenticar"]['setor'] = $servidor[0]->setor;
+            $ultimoAcesso = new \DateTime($servidor[0]['Usuario']->ultimo_acesso);
+            $_SESSION["Autenticar"]['ultimo_acesso'] = $ultimoAcesso->format('d/m/Y H:i:s');
+        } else {
+            throw new Autenticar\Exception("Usuário não encontrado na folha de pagamento.");
+        }
+    }
+
+    private function build_session_externo($cpf)
+    {
+        try {
+            $q = \Doctrine_Core::getTable("TCE\Autenticar\models\Usuario")
+                    ->createQuery("u")
+                    ->where("u.cpf = ?", $cpf);
+            if ($q->count() > 0) {
+                $usuario = $q->execute();
+                $_SESSION["Autenticar"]['usuario'] = !empty($usuario[0]->login) ? $usuario[0]->login : NULL;
+                $_SESSION["Autenticar"]['nome'] = $usuario[0]->nome;
+                $_SESSION["Autenticar"]['matricula'] = !empty($usuario[0]->matricula) ? $usuario[0]->matricula : NULL;
+                $_SESSION["Autenticar"]['cpf'] = $usuario[0]->cpf;
+                $_SESSION["Autenticar"]['setor'] = !empty($usuario[0]->setor) ? $usuario[0]->setor : NULL;
+                $ultimoAcesso = new \DateTime($usuario[0]->ultimo_acesso);
+                $_SESSION["Autenticar"]['ultimo_acesso'] = $ultimoAcesso->format('d/m/Y H:i:s');
+            }
+        } catch (\Exception $e) {
+            $response = array(
+                'success' => FALSE,
+                'mb' => array(
+                    'title' => "Erro",
+                    'msg' => $e->getMessage(),
+                    'icon' => 'ext-mb-error',
+                    'buttons' => 1
+                )
+            );
+        }
+    }
+
+    public function getUsuarioPerfil()
+    {
+        return $this->usuarioPerfil;
+    }
+
+    /**
+     * @RemoteMethod(AllowInvoke=TRUE)
+     */
+    public function getDesafio()
+    {
+        $ch = curl_init("http://www.tce.to.gov.br/Recepcao/Auth");
+        curl_setopt($ch, CURLOPT_POSTFIELDS, "metodo=0");
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_HEADER, 0);
+        $resposta = json_decode(curl_exec($ch));
+        curl_close($ch);
+        return $resposta;
+    }
+
+    /**
+     * @RemoteMethod(AllowInvoke=TRUE,Serializer='NULL')
+     */
+    public function getArquivosAssinados()
+    {
+        $sistema_id = isset($_GET['sistema_id']) ? $_GET['sistema_id'] : NULL;
+        foreach ($_FILES as $i => $arquivo) {
+            $nome_arquivo_pdf = md5_file($arquivo['tmp_name']);
+            move_uploaded_file($arquivo['tmp_name'], "../arquivos/" . $nome_arquivo_pdf);
+        }
+        return 0;
+    }
+
+    /**
+     * @RemoteMethod(AllowInvoke=TRUE)
+     */
+    public function validarDesafio($entrada, $saida)
+    {
+        $ch = curl_init("http://www.tce.to.gov.br/Recepcao/Auth");
+        $params = "metodo=1&";
+        $params .= "input_entrada_hidden_1=" . $entrada . "&";
+        $params .= "input_saida_1=" . $saida;
+
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $params);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_HEADER, 0);
+        $resposta = json_decode(curl_exec($ch));
+        curl_close($ch);
+        if ($resposta AND $resposta->success) {
+            $q = \Doctrine_Core::getTable("TCE\Autenticar\models\Usuario")
+                    ->createQuery("u")
+                    ->where("u.cpf = ?", $resposta->data->cpf);
+            if ($q->count() > 0) {
+                $this->build_session_externo($resposta->data->cpf);
+                $this->atualizar_externo($resposta->data->cpf);
+            } else {
+                $this->cadastrar_externo($resposta->data->cpf, $resposta->data->nome);
+                $this->build_session_externo($resposta->data->cpf);
+            }
+        } else {
+            $resposta = ["success" => FALSE, "msg" => "Erro não esperado."];
+        }
+        return $resposta;
+    }
+
+    public function ehUsuarioInterno()
+    {
+        return !empty($_SESSION['Autenticar']['matricula']);
+    }
+
+    public function temPerfil($sistema_id = NULL, array $perfis)
+    {
+        try {
+            if (empty($sistema_id)) {
+                $sistema_id = $this->usuarioPerfil->getSistemaPelaURL(UsuarioPerfil::RETORNO_LITERAL);
+            }
+            $this->array_walk($perfis, "utf8_decode");
+            $cpf = $_SESSION['Autenticar']['cpf'];
+            $p = \Doctrine_Core::getTable("TCE\Autenticar\models\Perfil")
+                    ->createQuery("p")
+                    ->innerJoin("p.UsuarioPerfil up")
+                    ->innerJoin("up.Usuario u")
+                    ->where("p.sistema_id = ?", $sistema_id)
+                    ->andWhere("u.cpf = ?", $cpf)
+                    ->andWhereIn("p.descricao", $perfis);
+            return ($p->count() > 0);
+        } catch (\Exception $exc) {
+            throw new \Champion\Exception($exc->getMessage());
+        }
+    }
+
+    private function ehCpf($user)
+    {
+        if (!preg_match('|^(\d{3})\.?(\d{3})\.?(\d{3})\-?(\d{2})$|', $user, $matches))
+            return false;
+
+        array_shift($matches);
+        $user = implode('', $matches);
+
+        for ($i = 0; $i < 10; $i++)
+            if ($user == str_repeat($i, 11))
+                return false;
+
+        for ($t = 9; $t < 11; $t++) {
+            for ($d = 0, $c = 0; $c < $t; $c++)
+                $d += $user[$c] * ($t + 1 - $c);
+
+            $d = ((10 * $d) % 11) % 10;
+
+            if ($user[$c] != $d)
+                return false;
+        }
+
+        return true;
+    }
+
+    public function gerarSenhaAleatoria($tamanho = 8, $maiusculas = true, $numeros = true, $simbolos = false)
+    {
+        // Caracteres de cada tipo
+        $lmin = 'abcdefghijklmnopqrstuvwxyz';
+        $lmai = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        $num = '1234567890';
+        $simb = '!@#$%*-';
+
+        // Variáveis internas
+        $retorno = '';
+        $caracteres = '';
+
+        // Agrupamos todos os caracteres que poderão ser utilizados
+        $caracteres .= $lmin;
+        if ($maiusculas)
+            $caracteres .= $lmai;
+        if ($numeros)
+            $caracteres .= $num;
+        if ($simbolos)
+            $caracteres .= $simb;
+
+        // Calculamos o total de caracteres possíveis
+        $len = strlen($caracteres);
+
+        for ($n = 1; $n <= $tamanho; $n++) {
+            // Criamos um número aleatório de 1 até $len para pegar um dos caracteres
+            $rand = mt_rand(1, $len);
+            // Concatenamos um dos caracteres na variável $retorno
+            $retorno .= $caracteres[$rand - 1];
+        }
+
+        return $retorno;
+    }
+
+    /**
+     * @RemoteMethod(AllowInvoke=TRUE)
+     */
+    public function criarUsuario($nome, $cpf)
+    {
+        try {
+            $this->initConnection("Autenticar");
+            $u = \Doctrine_Core::getTable("TCE\Autenticar\models\Usuario")
+                    ->createQuery("u")
+                    ->where("u.cpf = ?", $cpf)
+                    ->execute();
+            if (count($u) > 0) {
+                $resposta = [
+                    'success' => TRUE,
+                    'data' => [
+                        'id' => $u->id,
+                        'nome' => $u->nome,
+                        'cpf' => $u->cpf
+                    ]
+                ];
+            } else {
+                $senha = $this->gerarSenhaAleatoria();
+                $usuario = new \TCE\Autenticar\models\Usuario();
+                $usuario->nome = utf8_decode(strtoupper($nome));
+                $usuario->cpf = $this->removerCaracteres($cpf);
+                $usuario->matricula = NULL;
+                $usuario->login = NULL;
+                $usuario->senha = md5($senha);
+                $usuario->ultimo_acesso = NULL;
+                $usuario->save();
+                $resposta = [
+                    'success' => TRUE,
+                    'data' => [
+                        'id' => $usuario->id,
+                        'nome' => $usuario->nome,
+                        'cpf' => $usuario->cpf,
+                        'senha' => $senha
+                    ]
+                ];
+            }
+        } catch (\Exception $exc) {
+            $resposta = [
+                'success' => FALSE,
+                'msg' => $exc->getMessage()
+            ];
+        }
+
+        return $resposta;
+    }
+
+}

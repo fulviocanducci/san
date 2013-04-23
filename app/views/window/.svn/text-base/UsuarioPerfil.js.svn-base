@@ -1,0 +1,86 @@
+Ext.define('Autenticar.window.UsuarioPerfil', {
+    extend: 'Autenticar.window.ui.UsuarioPerfil',
+    requires: ['Autenticar.store.UsuarioPerfil', 'Autenticar.store.PerfilSistema'],
+    constructor: function() {
+        var me = this;
+        me.storeUsuarioPerfil = Ext.create('Autenticar.store.UsuarioPerfil');
+        me.storePerfilSistema = Ext.create('Autenticar.store.PerfilSistema');
+        me.callParent(arguments);
+    },
+    initComponent: function() {
+        var me = this;
+        me.callParent(arguments);
+    },
+    inicializar: function() {
+        Ext.Ajax.request({
+            method: 'POST',
+            url: '/autenticar/app/controllers/?&c=TCE_Autenticar_UsuarioPerfil&m=getSistemaPelaURL',
+            success: function(response) {
+                response = Ext.decode(response.responseText);
+                if (Ext.isEmpty(this.sistema_id)) {
+                    this.sistema_id = response.data.id;
+                }
+                this.storeUsuarioPerfil.removeAll();
+                this.storePerfilSistema.load({
+                    params: {
+                        sistema_id: this.sistema_id
+                    }
+                });
+            },
+            failure: function(response) {
+                var response = Ext.decode(response.responseText);
+                console.debug(response);
+            },
+            scope: this
+        });
+    },
+    excluir: function() {
+        Ext.Msg.show({
+            title: 'Confirmação de remoção',
+            msg: 'Deseja realmente remover este usuário para acessar este sistema?',
+            buttons: Ext.Msg.YESNO,
+            icon: Ext.Msg.QUESTION,
+            fn: function(resp) {
+                if (resp == 'yes') {
+                    Ext.Ajax.request({
+                        url: '/autenticar/app/controllers/?c=TCE_Autenticar_UsuarioPerfil&m=excluir',
+                        params: {
+                            sistema_id: this.sistema_id,
+                            usuario_id: this.usuario_id,
+                            perfil_id: this.perfil_id
+                        },
+                        success: function(response) {
+                            var response = Ext.decode(response.responseText);
+                            this.resetarPainelUsuarios();
+                            this.getBarraStatus().setStatus({
+                                text: response.mb.msg,
+                                iconCls: 'x-status-valid',
+                                clear: true
+                            });
+                        },
+                        failure: function(response) {
+                            var reponse = Ext.decode(response.responseText);
+                            console.debug(reponse);
+                        },
+                        scope: this
+                    });
+                }
+            },
+            scope: this
+        });
+    },
+    resetarPainelUsuarios: function() {
+        this.getBotaoRemoverUsuario().disable();
+        this.storeUsuarioPerfil.load({
+            params: {
+                perfil_id: this.perfil_id
+            }    
+        });
+    },
+    listeners: {
+        beforerender: function() {
+            this.inicializar();
+        }
+    }
+});
+

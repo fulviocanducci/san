@@ -1,0 +1,12 @@
+<phpunit>
+    <filter>
+        <blacklist>
+            <directory suffix=".php">/usr/share/php</directory>
+        </blacklist>
+    </filter>    
+    <testsuites>
+        <testsuite>
+            <directory>./controllers/</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>

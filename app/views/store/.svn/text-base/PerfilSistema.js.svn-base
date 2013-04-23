@@ -1,0 +1,19 @@
+Ext.define('Autenticar.store.PerfilSistema', {
+    extend: 'Champion.store.Base',
+    storeId: 'Autenticar.store.PerfilSistema',
+    fields: ['id', 'nome'],
+    proxy: {
+        type: 'ajax',
+        actionMethods: {
+            create: 'POST',
+            read: 'POST',
+            update: 'POST',
+            destroy: 'POST'
+        },
+        url: '/autenticar/app/controllers/?c=TCE_Autenticar_UsuarioPerfil&m=getPerfisPorSistema',
+        reader: {
+            type: 'json',
+            root: 'raiz'
+        }
+    }
+});

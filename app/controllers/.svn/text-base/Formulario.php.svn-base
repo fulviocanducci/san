@@ -1,0 +1,241 @@
+<?php
+
+namespace TCE\Autenticar\controllers;
+
+class FormularioSemPermissaoException extends \Champion\Exception {
+
+    public function __construct($idClasseJs)
+    {
+        parent::__construct("Permissão negada para acessar este formulário.", "Ext.getCmp('$idClasseJs').close();");
+    }
+
+}
+
+/**
+ * TCE\Autenticar\controllers\Formulario.php
+ * 
+ * Controla as requisições associados a um Formulario.
+ * @author Leonardo Sales <leonardojs@tce.to.gov.br>
+ * @version 1.0
+ * @package Autenticar
+ */
+
+/**
+ * @package Autenticar
+ * @subpackage controllers
+ * @RemoteClass
+ */
+class Formulario extends \Champion\Controller {
+
+    /**
+     * Cria ou atualiza um novo Formulario
+     * @return array
+     * @RemoteMethod
+     */
+    public function salvar()
+    {
+        try {
+            $this->array_walk_recursive_referential($_POST, "utf8_decode");
+
+            if (!empty($_POST['id'])) {
+                $formulario = \Doctrine_Core::getTable("TCE\Autenticar\models\Formulario")->find($_POST['id']);
+                $msg = "Formulário atualizado com sucesso.";
+            } else {
+                $formulario = new \TCE\Autenticar\models\Formulario();
+                $msg = "Formulário criado com sucesso.";
+            }
+            $formulario->descricao = $_POST['descricao'];
+            $formulario->nome = $_POST['nome'];
+            $formulario->sistema_id = $_POST['sistema_id'];
+            $formulario->save();
+            $resposta = [
+                'success' => TRUE,
+                'msg' => $msg
+            ];
+        } catch (\Champion\Exception $exc) {
+            $resposta = [
+                'success' => FALSE,
+                'msg' => $exc->getMessage(),
+            ];
+        }
+        return $resposta;
+    }
+
+    /**
+     * Carrega as informações de um Formulário baseado
+     * em um id.
+     * @param $formulario_id id do Formulário a ser carregado
+     * @return array
+     * @RemoteMethod
+     */
+    public function carregar($formulario_id)
+    {
+        try {
+            if (!empty($formulario_id)) {
+                $q = \Doctrine_Core::getTable("TCE\Autenticar\models\Formulario")
+                        ->find($formulario_id);
+                if ($q !== false) {
+                    $formulario = $q->toArray();
+                    $this->array_walk_recursive_referential($formulario, "utf8_encode");
+                } else {
+                    throw new \Champion\Exception("Não é possivel carregar o formulário com id = {$formulario_id}.");
+                }
+            } else {
+                throw new \Champion\Exception("Não é possivel carregar um formulário vazio.");
+            }
+            $resposta = array(
+                'success' => TRUE,
+                'data' => $formulario
+            );
+        } catch (\Champion\Exception $exc) {
+            $resposta = array(
+                'success' => FALSE,
+                'msg' => $exc->getMessage(),
+            );
+        }
+        return $resposta;
+    }
+
+    /**
+     * Exclui um Formulário
+     * @param $formulario_id id do Formulário a ser excluído.
+     * @return array
+     * @RemoteMethod
+     */
+    public function excluir($formularios_id)
+    {
+        try {
+            if (isset($formularios_id[0])) {
+                foreach ($formularios_id as $formulario_id) {
+                    if (!empty($formulario_id['id'])) {
+                        $q = \Doctrine_Core::getTable("TCE\Autenticar\models\Formulario")
+                                ->find($formulario_id['id'])
+                                ->delete();
+                    }
+                }
+            } else {
+                if (!empty($formularios_id['id'])) {
+                    $q = \Doctrine_Core::getTable("TCE\Autenticar\models\Formulario")
+                            ->find($formularios_id['id'])
+                            ->delete();
+                }
+            }
+            $resposta = array(
+                'success' => TRUE,
+                'msg' => "Formulário(s) excluído(s) com sucesso!"
+            );
+        } catch (\Champion\Exception $exc) {
+            $resposta = array(
+                'success' => FALSE,
+                'msg' => $exc->getMessage()
+            );
+        }
+        return $resposta;
+    }
+
+    /**
+     * Carrega todos os Formulários associados a
+     * um Perfil dentro de um Sistema.
+     * @param $sistema_id id do Sistema
+     * @param $perfil_id id do Perfil
+     * @return array
+     * @RemoteMethod
+     */
+    public function getTodos($sistema_id, $perfil_id = NULL)
+    {
+        try {
+            if (empty($sistema_id)) {
+                throw new \Champion\Exception("Não foi possível listar os formulários sem o id do sistema");
+            }
+            if (!empty($perfil_id)) {
+                $formularios = \Doctrine_Core::getTable("TCE\Autenticar\models\Formulario")
+                        ->createQuery("f")
+                        ->select("f.*")
+                        ->addSelect("(SELECT pf.id FROM TCE\Autenticar\models\PerfilFormulario pf WHERE f.id = pf.formulario_id AND pf.perfil_id = $perfil_id) as perfil_formulario_id")
+                        ->orderBy("f.descricao")
+                        ->where("f.sistema_id = ?", $sistema_id)
+                        ->execute()
+                        ->toArray();
+            } else {
+                $formularios = \Doctrine_Core::getTable("TCE\Autenticar\models\Formulario")
+                        ->createQuery("f")
+                        ->select("f.*")
+                        ->orderBy("f.descricao")
+                        ->where("f.sistema_id = ?", $sistema_id)
+                        ->execute()
+                        ->toArray();
+            }
+            $this->array_walk_recursive_referential($formularios, "utf8_encode");
+            $resposta = array(
+                'success' => TRUE,
+                'raiz' => $formularios
+            );
+        } catch (\Champion\Exception $exc) {
+            $resposta = array(
+                'success' => FALSE,
+                'msg' => $exc->getMessage()
+            );
+        }
+        return $resposta;
+    }
+
+    /** @RemoteMethod(AllowInvoke=TRUE) */
+    public function verificarAcesso($idClasseJs)
+    {
+        try {
+            $up = new \TCE\Autenticar\controllers\UsuarioPerfil();
+            if (isset($_SESSION['Autenticar']['cpf'])) {
+                $cpf = $_SESSION['Autenticar']['cpf'];
+            } else {
+                throw new \Champion\Exception("Não foi possivel determinar o usuário", "Ext.getCmp('$idClasseJs').close();");
+            }
+            $sistema_id = $up->getSistemaPelaURL(UsuarioPerfil::RETORNO_LITERAL);
+            $q = \Doctrine_Core::getTable("TCE\Autenticar\models\Formulario")
+                    ->createQuery("f")
+                    ->innerJoin('f.PerfilFormulario pf')
+                    ->innerJoin('pf.Perfil p')
+                    ->innerJoin('p.UsuarioPerfil up')
+                    ->innerJoin('up.Usuario u')
+                    ->where("f.nome = ?", $idClasseJs)
+                    ->andWhere("f.sistema_id = ?", intval($sistema_id))
+                    ->andWhere("u.cpf = ?", trim($cpf));
+            if ($q->count() > 0) {
+                $formularios = $q->execute()->toArray();
+                $this->array_walk($formularios, "utf8_encode");
+                $perfis = array();
+                foreach ($formularios[0]['PerfilFormulario'] as $i => $perfilFormulario) {
+                    if (!intval($perfilFormulario['acesso_externo']) AND !$this->ehHostRedeInterna()) {
+                        throw new FormularioSemPermissaoException($idClasseJs);
+                    }
+                    $perfis[$perfilFormulario['Perfil']['descricao']] = array(intval($perfilFormulario['incluir']), intval($perfilFormulario['alterar']), intval($perfilFormulario['excluir']));
+                }
+                $resposta = array(
+                    'success' => TRUE,
+                    'p' => $perfis
+                );
+            } else {
+                throw new FormularioSemPermissaoException($idClasseJs);
+            }
+        } catch (FormularioSemPermissaoException $exc) {
+            $resposta = array(
+                'success' => FALSE,
+                'mb' => array(
+                    'title' => "Permissão negada",
+                    'msg' => $exc->getMessage()
+                ),
+                'action' => $this->_minify($exc->getAction())
+            );
+        } catch (\Champion\Exception $exc) {
+            return array(
+                'success' => FALSE,
+                'mb' => array(
+                    'title' => "Permissão negada",
+                    'msg' => $exc->getMessage()
+                ),
+                'action' => $this->_minify($exc->getAction())
+            );
+        }
+        return $resposta;
+    }
+
+}

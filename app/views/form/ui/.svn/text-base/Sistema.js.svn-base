@@ -1,0 +1,128 @@
+Ext.define('Autenticar.form.ui.Sistema', {
+    extend: 'Champion.form.Base',
+    title: 'Visualização de Sistemas',
+    bodyPadding: 5,
+    layout: 'fit',
+    id: 'Autenticar.form.Sistema',
+    initComponent: function() {
+        var me = this;
+        Ext.apply(me, {
+            tbar: [
+            this.getBotaoNovo(),
+            this.getBotaoEditar()
+            ],
+            items: [
+            this.getGridSistema()
+            ],
+            bbar: this.getBarraStatus()
+        });
+        me.callParent(arguments);
+    },
+    getBotaoNovo: function() {
+        if (!this.botaoNovo) {
+            this.botaoNovo = Ext.widget("button", {
+                text: 'Novo',
+                iconCls: 'silk-application-add',
+                handler: function() {
+                    Ext.create('Autenticar.window.Sistema').show();
+                },
+                scope: this
+            });
+        }
+        return this.botaoNovo;
+    },
+    getBotaoEditar: function() {
+        if (!this.botaoEditar) {
+            this.botaoEditar = Ext.widget("button", {
+                text: 'Editar',
+                iconCls: 'silk-application-edit',
+                disabled: true,
+                handler: function() {
+                    record = this.getGridSistema().getSelectionModel().getSelection();
+                    Ext.create('Autenticar.window.Sistema', {
+                        sistema_id: record[0].internalId
+                    }).show();
+                },
+                scope: this
+            });
+        }
+        return this.botaoEditar;
+    },
+    getGridSistema: function() {
+        if (!this.gridSistema) {
+            this.gridSistema = Ext.widget("gridpanel", {
+                store: this.storeSistema,
+                viewConfig  : {
+                    loadMask: true
+                },
+                multiSelect: true,
+                columns: [
+                {
+                    header: 'Descrição',
+                    dataIndex: 'descricao',
+                    flex: 1
+                },
+                {
+                    header: 'URL Inicial',
+                    dataIndex: 'url_inicial',
+                    width: 400
+                },
+                {
+                    xtype: 'actioncolumn',
+                    header: 'Usuários',
+                    width: 70,
+                    align: 'center',
+                    items: [{
+                        icon: '/resources/extjs/icons/fam/group.png',
+                        tooltip: 'Clique para associar usuários à perfis no sistema',
+                        handler: function(grid, rowIndex, colIndex) {
+                            var rec = grid.getStore().getAt(rowIndex);
+                            Ext.create('Autenticar.window.UsuarioPerfil', {
+                                sistema_id: rec.internalId
+                            }).show();
+                        }
+                    }]
+                },
+                {
+                    xtype: 'actioncolumn',
+                    header: 'Formulários',
+                    width: 70,
+                    align: 'center',
+                    items: [{
+                        icon: '/resources/extjs/icons/fam/application_form.png',
+                        tooltip: 'Clique para associar os formulários à perfis no sistema',
+                        handler: function(grid, rowIndex, colIndex) {
+                            var rec = grid.getStore().getAt(rowIndex);
+                            Ext.create('Autenticar.window.PerfilFormulario', {
+                                sistema_id: rec.internalId
+                            }).show();
+                        }
+                    }]
+                }
+                ],
+                listeners: {
+                    itemclick: function(el, record) {
+                        this.getBotaoEditar().enable();
+                    },
+                    itemdblclick: function(el, record) {
+                        Ext.create('Autenticar.window.Sistema', {
+                            sistema_id: record.internalId
+                        }).show();
+                    },
+                    scope: this
+                }
+            });
+        }
+        return this.gridSistema;
+    },
+    getBarraStatus: function() {
+        if (!this.barraStatus) {
+            this.barraStatus = Ext.widget("statusbar", {
+                defaultText: '',
+                text: '',
+                iconCls: 'x-status-valid'
+            });
+        }
+        return this.barraStatus;
+    }
+});

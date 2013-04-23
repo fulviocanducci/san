@@ -1,0 +1,3 @@
+Ext.define('Autenticar.form.Usuario', {
+    extend: 'Autenticar.form.ui.Usuario'
+});

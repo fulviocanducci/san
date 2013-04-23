@@ -1,0 +1,61 @@
+Ext.define('Autenticar.window.Sistema', {
+    extend: 'Autenticar.window.ui.Sistema',
+    constructor: function() {
+        var me = this;
+        me.formSistema = Ext.getCmp('Autenticar.form.Sistema');
+        me.callParent(arguments);
+    },
+    carregar: function() {
+        if (this.sistema_id) {
+            Ext.Ajax.request({
+                url: TCE.Autenticar.getUrlController('Sistema', 'carregar'),
+                params: {
+                    sistema_id: this.sistema_id
+                },
+                success: function(response) {
+                    var response = Ext.decode(response.responseText);
+                    if (response.success) {
+                        this.down('form').getForm().setValues(response.data);
+                    }
+                },
+                failure: function(response) {
+                    var response = Ext.decode(response.responseText);
+                    console.debug(response);
+                },
+                scope: this
+            });
+        }
+    },
+    aplicarPermissoes: function() {
+        this.getCheckboxCriarProjeto().disable();
+        this.getCheckboxCriarRepostiorio().disable();
+        if (Ext.isEmpty(this.sistema_id)) {
+            if (this.temPermissaoIncluir()) {
+                this.getBotaoSalvar().enable();
+            } else {
+                this.getBotaoSalvar().disable();
+            }
+            this.getBotaoExcluir().disable();
+            if (this.temPerfil('Administrador')) {
+                this.getCheckboxCriarProjeto().enable();
+                this.getCheckboxCriarRepostiorio().enable();
+            }
+        } else {
+            if (this.temPermissaoAlterar()) {
+                this.getBotaoSalvar().enable();
+            } else {
+                this.getBotaoSalvar().disable();
+            }
+            if (this.temPermissaoExcluir()) {
+                this.getBotaoExcluir().enable();
+            } else {
+                this.getBotaoExcluir().disable();
+            }
+        }
+    },
+    listeners: {
+        afterrender: function() {
+            this.carregar();
+        }
+    }
+});

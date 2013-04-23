@@ -1,0 +1,220 @@
+<?php
+
+namespace TCE\Autenticar\controllers;
+
+/** @RemoteClass */
+class Sistema extends \Champion\Controller {
+
+    /** @RemoteMethod */
+    public function salvar()
+    {
+        try {
+            $this->array_walk_recursive_referential($_POST, "utf8_decode");
+            $nome_interno = strtolower(trim($_POST['nome_interno']));
+            $this->getConnection()->beginTransaction();
+            if (!empty($_POST['id'])) {
+                $sistema = \Doctrine_Core::getTable("TCE\Autenticar\models\Sistema")->find($_POST['id']);
+                $msg = "Sistema atualizado com sucesso.";
+            } else {
+                $sistema = new \TCE\Autenticar\models\Sistema();
+                $msg = "Sistema criado com sucesso.";
+            }
+            $sistema->descricao = $_POST['descricao'];
+            $sistema->sigla = $_POST['sigla'];
+            $sistema->nome_interno = $_POST['nome_interno'];
+            $sistema->url_inicial = "/" . $nome_interno . "/app/index.php";
+            $sistema->url_icone = $_POST['url_icone'];
+            if (empty($_POST['id'])) {
+                $sistema->Perfil[0]->descricao = "Administrador";
+                $sistema->Perfil[0]->padrao = 1;
+                $sistema->Formulario[0]->descricao = utf8_decode("Associação de Usuário à Perfis");
+                $sistema->Formulario[0]->nome = "Autenticar.window.UsuarioPerfil";
+                $sistema->Formulario[1]->descricao = utf8_decode("Adicionar usuário ao perfil");
+                $sistema->Formulario[1]->nome = "Autenticar.window.Usuario";
+                $sistema->save();
+                foreach ($sistema->Formulario as $key => $formulario) {
+                    $pf = new \TCE\Autenticar\models\PerfilFormulario();
+                    $pf->perfil_id = $sistema->Perfil[0]->id;
+                    $pf->formulario_id = $formulario->id;
+                    $pf->incluir = 1;
+                    $pf->alterar = 1;
+                    $pf->excluir = 1;
+                    $pf->acesso_externo = 1;
+                    $pf->save();
+                }
+                if ($this->getConfigurator()->isDevMode() AND function_exists("svn_log")) {
+                    $url_repositorio = "svn://" . \Champion::SVN_SERVER . "/" . \Champion::BASE_REPOSITORY . "/";
+                    $repos = $url_repositorio . $nome_interno;
+                    if (@svn_log($repos)) {
+                        throw new \TCE\Autenticar\classes\RepositorioExistenteException($repos);
+                    }
+                    if (isset($_POST['criar_repositorio']) AND $_POST['criar_repositorio'] == "on") {
+                        svn_copy("Importação Inicial", $url_repositorio . "base/", $url_repositorio . $nome_interno . "/", false);
+                    }
+                    if (isset($_POST['criar_projeto']) AND $_POST['criar_projeto'] == "on") {
+                        svn_checkout($url_repositorio . $nome_interno . "/trunk", "/var/www/" . $nome_interno);
+
+                        $arquivo_settings = "/var/www/" . $nome_interno . "/app/conf/Configurator.php";
+                        $settings = file_get_contents($arquivo_settings);
+                        $settings = str_replace(array("namespace TCE\Base\conf;", "<!-- DESCRICAO_PROJETO -->"), array("namespace TCE\\" . $_POST['nome_interno'] . "\\conf;", $_POST['descricao']), $settings);
+                        file_put_contents($arquivo_settings, $settings);
+
+                        $arquivo_app = "/var/www/" . $nome_interno . "/app/controllers/Base.php";
+                        $conteudo_app = file_get_contents($arquivo_app);
+                        $conteudo_app = str_replace(array("class Base "), array("class " . $_POST['nome_interno'] . " "), $conteudo_app);
+                        $novo_arquivo_app = "/var/www/" . $nome_interno . "/app/controllers/" . $_POST['nome_interno'] . ".php";
+                        file_put_contents($novo_arquivo_app, $conteudo_app);
+
+                        $arquivo_tmp = "/var/www/" . $nome_interno . "/app/controllers/tmpconf.php";
+                        $conteudo_tmp = file_get_contents($arquivo_tmp);
+                        $conteudo_tmp = str_replace(array("namespace TCE\Base\controllers;"), array("namespace TCE\\" . $_POST['nome_interno'] . "\controllers;"), $conteudo_tmp);
+                        file_put_contents($arquivo_tmp, $conteudo_tmp);
+
+                        svn_delete($arquivo_app);
+                        svn_add($novo_arquivo_app);
+                        svn_commit("Criação do arquivo aplicativo", array("/var/www/" . $nome_interno . "/"));
+                        svn_update("/var/www/" . $nome_interno . "/");
+                    }
+                }
+            } else {
+                $sistema->save();
+            }
+            $this->getConnection()->commit();
+            return [
+                'success' => TRUE,
+                'msg' => $msg
+            ];
+        } catch (\TCE\Autenticar\classes\RepositorioExistenteException $exc) {
+            $this->getConnection()->rollback();
+            $this->getConnection()->close();
+            return [
+                'success' => FALSE,
+                'msg' => $exc->getMessage()
+            ];
+        } catch (\Champion\Exception $exc) {
+            $this->getConnection()->rollback();
+            $this->getConnection()->close();
+            return [
+                'success' => FALSE,
+                'msg' => $exc->getMessage()
+            ];
+        }
+    }
+
+    /** @RemoteMethod */
+    public function carregar($id)
+    {
+        try {
+            if (!is_null($id)) {
+                $sistema = \Doctrine_Core::getTable("TCE\Autenticar\models\Sistema")
+                        ->find($id);
+                if ($sistema) {
+                    $sistema = $sistema->toArray();
+                } else {
+                    throw new \Exception("id de sistema nao localizado");
+                }
+                $this->array_walk_recursive_referential($sistema, "utf8_encode");
+            }
+            return array(
+                'success' => TRUE,
+                'data' => $sistema
+            );
+        } catch (\Exception $exc) {
+            return array(
+                'success' => FALSE,
+                'msg' => $exc->getMessage()
+            );
+        }
+    }
+
+    /** @RemoteMethod */
+    public function excluir($sistemas)
+    {
+        try {
+            $this->getConnection()->beginTransaction();
+            if (!empty($sistemas['id'])) {
+                $sistema_id = intval($sistemas['id']);
+                $q = \Doctrine_Core::getTable("TCE\Autenticar\models\Sistema")
+                        ->find($sistema_id)
+                        ->delete();
+            }
+            $this->getConnection()->commit();
+        } catch (\Doctrine_Query_Exception $exc) {
+            $resposta = array(
+                'success' => FALSE,
+                'msg' => $exc->getMessage()
+            );
+            $this->getConnection()->rollback();
+        }
+        return $resposta;
+    }
+
+    /** @RemoteMethod(AllowInvoke=TRUE) */
+    public function getTodos()
+    {
+        $sistemas = \Doctrine_Core::getTable("TCE\Autenticar\models\Sistema")
+                ->createQuery("s")
+                ->orderBy("s.descricao")
+                ->execute()
+                ->toArray();
+        $resposta = array(
+            'raiz' => $sistemas
+        );
+        $this->array_walk_recursive_referential($resposta, "utf8_encode");
+        return $resposta;
+    }
+
+    /** @RemoteMethod(AllowInvoke=TRUE) */
+    public function getSistemasPorUsuario()
+    {
+        $up = new \TCE\Autenticar\controllers\UsuarioPerfil();
+        $sistema_id = $up->getSistemaPelaURL(UsuarioPerfil::RETORNO_LITERAL);
+        $cpf = isset($_SESSION['Autenticar']['cpf']) ? $_SESSION['Autenticar']['cpf'] : "";
+        if (!empty($cpf)) {
+            $q = \Doctrine_Core::getTable("TCE\Autenticar\models\Sistema")
+                    ->createQuery("s")
+                    ->select("s.*")
+                    ->innerJoin('s.Formulario f')
+                    ->innerJoin('f.PerfilFormulario pf')
+                    ->innerJoin('pf.Perfil p')
+                    ->innerJoin('p.UsuarioPerfil up')
+                    ->innerJoin('up.Usuario u')
+                    ->where("u.cpf = ?", trim($cpf))
+                    ->orderBy("s.sigla")
+                    ->execute()
+                    ->toArray();
+            $this->array_walk_recursive_referential($q, "utf8_encode");
+            $sistemas = array();
+            foreach ($q as $i => $sistema) {
+                $sistemas[$i] = array(
+                    'leaf' => TRUE,
+                    'text' => $sistema['sigla'],
+                    'qtip' => $sistema['descricao'],
+                    'descricao' => $sistema['descricao'],
+                    'url' => $sistema['url_inicial']
+                );
+                if ($sistema_id == $sistema['id']) {
+                    $sistemas[$i]['selected'] = true;
+                }
+            }
+            return array("raiz" => $sistemas);
+        }
+    }
+
+    public function getSistemaPorNamespace($namespace)
+    {
+        $this->initConnection("Autenticar");
+        $q = \Doctrine_Core::getTable("TCE\Autenticar\models\Sistema")
+                ->createQuery("s")
+                ->where("s.nome_interno LIKE N'$namespace'");
+
+        $resposta = FALSE;
+        if ($q->count() > 0) {
+            $sistema = $q->execute();
+            $resposta = intval($sistema[0]->id);
+        }
+        return $resposta;
+    }
+
+}
+

@@ -1,0 +1,123 @@
+Ext.require('Autenticar.store.Usuario', function() {
+    Ext.define('Autenticar.window.ui.Usuario', {
+        extend: 'Champion.window.Base',
+        id: 'Autenticar.window.Usuario',
+        layout: 'fit',
+        height: 130,
+        width: 400,
+        title: 'Adicionar usuário ao perfil',
+        modal: true,
+        resizable: false,
+        constructor: function() {
+            var me = this;
+            me.window = {};
+            me.window.usuarioPerfil = Ext.getCmp('Autenticar.window.UsuarioPerfil');
+            me.storeUsuario = Ext.create('Autenticar.store.Usuario');
+            me.callParent(arguments);
+        },
+        getBotaoInserir: function() {
+            if (!this.botaoInserir) {
+                this.botaoInserir = Ext.widget("button", {
+                    text: 'Inserir',
+                    iconCls: 'silk-disk',
+                    formBind: true,
+                    disabled: true,
+                    handler: function() {
+                        var form = this.down('form').getForm();
+                        if (form.isValid()) {
+                            form.submit({
+                                url: '/autenticar/app/controllers/?&c=TCE_Autenticar_Usuario&m=salvar',
+                                success: function(form, action) {
+                                    var response = action.result;
+                                    this.window.usuarioPerfil.resetarPainelUsuarios();
+                                    this.window.usuarioPerfil.getBarraStatus().setStatus({
+                                        text: response.msg,
+                                        iconCls: 'x-status-valid',
+                                        clear: true
+                                    });
+                                    this.close();
+                                },
+                                failure: function(form, action) {
+                                    this.window.usuarioPerfil.getBarraStatus().setStatus({
+                                        text: response.msg,
+                                        iconCls: 'x-status-error',
+                                        clear: true
+                                    });
+                                },
+                                scope: this
+                            });
+                        }
+                    },
+                    scope: this
+                });
+            }
+            return this.botaoInserir;
+        },
+        getCampoNome: function() {
+            if (!this.campoNome) {
+                this.campoNome = Ext.widget("combo", {
+                    fieldLabel: 'Nome',
+                    labelWidth: 50,
+                    name: 'usuario_id',
+                    hideTrigger: true,
+                    store: this.storeUsuario,
+                    displayField: 'nome',
+                    valueField: 'id',
+                    loadingText: 'Procurando...',
+                    forceSelection: true,
+                    listeners: {
+                        select: function(obj) {
+                            this.getBotaoInserir().enable();
+                        },
+                        scope: this
+                    },
+                    allowBlank: false,
+                    scope: this
+                });
+            }
+            return this.campoNome;
+        },
+        initComponent: function() {
+            var me = this;
+            Ext.applyIf(me, {
+                items: [
+                {
+                    xtype: 'form',
+                    layout: 'anchor',
+                    id: 'Autenticar.window.form.Usuario',
+                    bodyPadding: 10,
+                    defaults: {
+                        anchor: '100%'
+                    },
+                    border: false,
+                    items: [
+                    {
+                        xtype: 'hidden',
+                        name: 'sistema_id',
+                        value: this.sistema_id
+                    },
+                    {
+                        xtype: 'hidden',
+                        name: 'perfil_id',
+                        value: this.perfil_id
+                    },
+                    this.getCampoNome()
+                    ]
+                }
+                ],
+                buttons: [
+                    this.getBotaoInserir(),
+                    {
+                        text: 'Fechar',
+                        iconCls: 'silk-cross',
+                        handler: function() {
+                            this.close();
+                        },
+                        scope: this
+                    }
+                ]
+            });
+            me.callParent(arguments);
+        }
+    });
+});

@@ -1,0 +1,5 @@
+RewriteEngine On
+RewriteRule ^app/app.js$ app/controllers/index.php?client=proxyobjects,jsonrpc,haserializer&stub=all
+RewriteRule ^app/controllers\/([A-Za-z0-9_]*)\/([A-Za-z0-9_]*)\/?$ app/controllers/index.php?c=$1&m=$2
+
+SetOutputFilter DEFLATE

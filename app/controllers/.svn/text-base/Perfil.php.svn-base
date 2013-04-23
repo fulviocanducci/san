@@ -1,0 +1,111 @@
+<?php
+
+namespace TCE\Autenticar\controllers;
+
+/** @RemoteClass */
+class Perfil extends \Champion\Controller {
+
+    /** @RemoteMethod */
+    public function salvar()
+    {
+        try {
+            $this->array_walk_recursive_referential($_POST, "utf8_decode");
+
+            if (!empty($_POST['id'])) {
+                $perfil = \Doctrine_Core::getTable("TCE\Autenticar\models\Perfil")->find($_POST['id']);
+                $msg = "Perfil atualizado com sucesso!";
+            } else {
+                $perfil = new \TCE\Autenticar\models\Perfil();
+                $msg = "Perfil criado com sucesso!";
+            }
+            $perfil->descricao = $_POST['descricao'];
+            $perfil->sistema_id = $_POST['sistema_id'];
+            $perfil->save();
+            return array(
+                'success' => TRUE,
+                'msg' => $msg
+            );
+        } catch (\Champion\Exception $exc) {
+            return array(
+                'success' => FALSE,
+                'msg' => $exc->getMessage()
+            );
+        }
+    }
+
+    /** @RemoteMethod */
+    public function carregar($id)
+    {
+        if (!is_null($id)) {
+            $perfil = \Doctrine_Core::getTable("TCE\Autenticar\models\Perfil")
+                    ->find($id)
+                    ->toArray();
+            $this->array_walk_recursive_referential($perfil, "utf8_encode");
+        }
+        return array(
+            'success' => TRUE,
+            'data' => array(
+                'id' => $perfil['id'],
+                'descricao' => $perfil['descricao']
+            )
+        );
+    }
+
+    /** @RemoteMethod */
+    public function excluir($perfil_id)
+    {
+        try {
+            if (!empty($perfil_id['id'])) {
+                $q = \Doctrine_Core::getTable("TCE\Autenticar\models\Perfil")
+                        ->find($perfil_id['id'])
+                        ->delete();
+            }
+            $resposta = array(
+                'success' => TRUE,
+                'msg' => "Perfil excluído com sucesso!"
+            );
+        } catch (\Champion\Exception $exc) {
+            $resposta = array(
+                'success' => FALSE,
+                'msg' => $exc->getMessage()
+            );
+        }
+        return $resposta;
+    }
+
+    /** @RemoteMethod */
+    public function getTodos($sistema_id)
+    {
+        $perfis = \Doctrine_Core::getTable("TCE\Autenticar\models\Perfil")
+                ->createQuery("p")
+                ->orderBy("p.descricao")
+                ->where("p.sistema_id = ?", $sistema_id)
+                ->execute()
+                ->toArray();
+        $this->array_walk_recursive_referential($perfis, "utf8_encode");
+        return array(
+            'raiz' => $perfis
+        );
+    }
+
+    /** @RemoteMethod */
+    public function usuarioTemPerfil($descricao_perfil)
+    {
+        if (is_array($descricao_perfil)) {
+            
+        } else {
+            
+        }
+        $perfis = \Doctrine_Core::getTable("TCE\Autenticar\models\Perfil")
+                ->createQuery("p")
+                ->orderBy("p.descricao")
+                ->where("p.sistema_id = ?", $sistema_id)
+                ->execute()
+                ->toArray();
+        $this->array_walk_recursive_referential($perfis, "utf8_encode");
+        return array(
+            'raiz' => $perfis
+        );
+    }
+
+}

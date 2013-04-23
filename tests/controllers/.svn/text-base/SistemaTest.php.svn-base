@@ -1,0 +1,35 @@
+<?php
+
+require 'PHPUnit/Framework/TestCase.php';
+
+class SistemaTest extends PHPUnit_Framework_TestCase {
+
+    private $sistema;
+
+    protected function setUp() {
+        $this->sistema = new \TCE\Autenticar\controllers\Sistema();
+    }
+
+    /**
+     * @test
+     * @covers \TCE\Autenticar\controllers\Sistema::carregar
+     */
+    public function checarCarregamentoDadosInexistentes() {
+        $resposta = $this->sistema->carregar(1);
+        $this->assertFalse($resposta['success']);
+    }
+
+    /**
+     * @test
+     * @covers \TCE\Autenticar\controllers\Sistema::carregar
+     */
+    public function checarCarregamentoDadosExistentes() {
+        $resposta = $this->sistema->carregar(12);
+        $this->assertTrue($resposta['success']);
+    }
+
+    protected function tearDown() {
+        
+    }
+
+}

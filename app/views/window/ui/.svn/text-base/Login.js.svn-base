@@ -1,0 +1,263 @@
+Ext.define('Autenticar.window.ui.Login', {
+    extend: 'Champion.window.Base',
+    id: 'Autenticar.window.Login',
+    height: 160,
+    width: 510,
+    title: 'Autenticação de Usuários',
+    layout: 'anchor',
+    modal: true,
+    exibeCertificacao: true,
+    exibeUsuarioSenha: true,
+    closable: false,
+    resizable: false,
+    checarPermissao: false,
+    initComponent: function() {
+        var me = this;
+        Ext.apply(me, {
+            items: [
+            {
+                xtype: 'tabpanel',
+                activeItem: 0,
+                border: false,
+                items: [
+                this.exibeUsuarioSenha ? this.getAbaUsuarioSenha() : null,
+                this.exibeCertificacao ? this.getAbaCertificadoDigital() : null
+                ]
+            }            
+            ]
+        });
+
+        me.callParent(arguments);
+    },
+    getCampoUsuario: function() {
+        if (!this.campoUsuario) {
+            this.campoUsuario = Ext.widget("textfield", {
+                name: 'usuario',
+                fieldLabel: 'Usuário',
+                anchor: '100%',
+                allowBlank: false,
+                listeners: {
+                    specialkey: function(field, e) {
+                        if (e.getKey() == e.ENTER) {
+                            this.getBotaoEntrar().handler.call(this.getBotaoEntrar().scope);
+                        }
+                    },
+                    scope: this
+                },
+                msgTarget: 'side'
+            });
+        }
+        return this.campoUsuario;
+    },
+    getCampoSenha: function() {
+        if (!this.campoSenha) {
+            this.campoSenha = Ext.widget("textfield", {
+                inputType: 'password',
+                name: 'senha',
+                fieldLabel: 'Senha',
+                allowBlank: false,
+                anchor: '100%',
+                listeners: {
+                    specialkey: function(field, e) {
+                        if (e.getKey() == e.ENTER) {
+                            this.getBotaoEntrar().handler.call(this.getBotaoEntrar().scope);
+                        }
+                    },
+                    scope: this
+                },
+                msgTarget: 'side'
+            });
+        }
+        return this.campoSenha;
+    },
+    getBotaoEntrar: function() {
+        if (!this.botaoEntrar) {
+            this.botaoEntrar = Ext.widget("button", {
+                text: 'Entrar',
+                handler: function() {
+                    form = this.down('form');
+                    if (form.getForm().isValid()) {
+                        this.body.mask('Aguarde...');
+                        form.submit({
+                            success: function(form, action) {
+                                resp = action.result;
+                                if (resp.success) {
+                                    eval(INDEX_METHOD);
+                                } else {
+                                    Ext.Msg.show({
+                                        closable: false,
+                                        modal: true,
+                                        title: "Falha na autenticação",
+                                        msg: resp.msg,
+                                        buttons: Ext.Msg.OK,
+                                        icon: Ext.Msg.ERROR
+                                    });
+                                }
+                            },
+                            failure: function(form, action) {
+                                resp = action.result;
+                                switch (action.failureType) {
+                                    case Ext.form.Action.CLIENT_INVALID:
+                                        Ext.Msg.show({
+                                            closable: false,
+                                            modal: true,
+                                            title: 'Falha',
+                                            msg: 'Os campos do formulário não podem ser enviados com valores inválidos.',
+                                            buttons: Ext.Msg.OK,
+                                            icon: Ext.Msg.WARNING
+                                        });
+                                        break;
+                                    case Ext.form.Action.CONNECT_FAILURE:
+                                        Ext.Msg.show({
+                                            closable: false,
+                                            modal: true,
+                                            title: 'Falha',
+                                            msg: 'Falha na comunicação com o servidor.<br>Impossível efetuar autenticação.',
+                                            buttons: Ext.Msg.OK,
+                                            icon: Ext.Msg.ERROR
+                                        });
+                                        break;
+                                    case Ext.form.Action.SERVER_INVALID:
+                                        Ext.Msg.show({
+                                            closable: false,
+                                            modal: true,
+                                            title: resp.mb.title,
+                                            msg: resp.mb.msg,
+                                            buttons: Ext.Msg.OK,
+                                            icon: Ext.Msg.WARNING
+                                        });
+                                        this.down('form').getForm().reset();
+                                        this.getCampoUsuario().setValue(resp.usuario);
+                                        this.getCampoSenha().focus();
+                                        break;
+                                }
+                                this.body.unmask();
+                            },
+                            scope: this
+                        });
+                    }
+                },
+                scope: this
+            });
+        }
+        return this.botaoEntrar;
+    },
+    getContainerApplet: function() {
+        if (!this.containerApplet) {
+            this.containerApplet = Ext.widget("container", {
+                hidden: true,
+                html: [
+                '<applet style="z-index: -1; position: relative;" id="applet" name="Autentição e-TCE" codebase="./"',
+                'code="br.com.bry.signer.applet.formHtml.SignerFormApplet.class"',
+                'width="350" height="50" archive="/resources/certificacao/v2.0.1/applet_certificacao.jar,/resources/certificacao/v2.0.1/lib/reps/BRy-Repositorio_Mozilla_Windows-2.0.1.0.jar,/resources/certificacao/v2.0.1/lib/reps/BRy-Repositorio_Windows-2.0.1.0.jar,/resources/certificacao/v2.0.1/lib/cades/BRy-CADES-Dependencias-2.0.1.0.jar"',
+                'mayscript>',
+                '<param NAME="padrao.assinatura" VALUE="8">',
+                '<param NAME="tipo.assinatura" VALUE="0">',
+                '<param NAME="tipo.applet" VALUE="0">',
+                '<param NAME="atributo.assinatura.cadesXades.politica" VALUE="ADRB">',
+//                '<param NAME="atributo.assinatura.cadesXades.politica.versao" VALUE="2.1">',
+//                '<param NAME="atributo.assinatura.cadesXades.algoritmoHash" VALUE="SHA256">',
+                '<param NAME="atributo.assinatura.cadesXades.modoICPBrasil" VALUE="False">',
+                '<param NAME="nome.inputEntrada" VALUE="input_autenticacao_desafio">',
+                '<param NAME="nome.inputSaida" VALUE="input_autenticacao_saida">',
+                '<param NAME="salvar.automaticamente" VALUE="false" />',
+                '<param NAME="exibe.janela.salvar" VALUE="false" />',
+                '<param NAME="assinatura.diretorio.salvar" VALUE="" />',
+                '<param NAME="assinatura.nome.arquivo.salvar" VALUE="login" />',
+                '<param NAME="formato.dados.entrada" VALUE="1">',
+                '<param NAME="formato.dados.saida" VALUE="1">',
+                '<param NAME="tipo.applet.login" VALUE="true">',
+                '<param NAME="interface.cor.fundo" VALUE="FFFFFF">',
+                '<param NAME="exibe.atualizar" VALUE="false">',
+                '<param name="exibe.assinar" value="true" />',
+                '<param NAME="exibe.salvar" VALUE="false" />',
+                '<param NAME="nome.funcao.retorno" VALUE="finaliza_autenticacao">',
+                '<param NAME="filtro.cpf" VALUE="" />',
+                '<param NAME="filtro.cnpj" VALUE="" />',
+                '<param NAME="inclui.cadeia" VALUE="false">',
+                '<param NAME="inclui.lcr" VALUE="false">',
+                '<param NAME="ignorar.busca.lcr" VALUE="true">',
+//                '<param NAME="perfil.assinatura" VALUE="ADRB">',
+//                '<param NAME="politica.assinatura" VALUE="1.0">',
+                '<param NAME="interface.mini" VALUE="true">',
+                '<param NAME="nome.funcao.mensagem" VALUE="alerta_autenticacao">',
+                '<p>Navegador sem suporte a java!</p>',
+                '<param NAME="cache_archive" VALUE="/resources/certificacao/v2.0.1/applet_certificacao.jar,/resources/certificacao/v2.0.1/lib/reps/BRy-Repositorio_Mozilla_Windows-2.0.1.0.jar,/resources/certificacao/v2.0.1/lib/reps/BRy-Repositorio_Windows-2.0.1.0.jar,/resources/certificacao/v2.0.1/lib/cades/BRy-CADES-Dependencias-2.0.1.0.jar" />',
+                '<param NAME="cache_version" VALUE="2.0.1.0,2.0.1.0,2.0.1.0,2.0.1.0,2.0.1.0" />',
+                '</applet>'
+                ]
+            });
+        }
+        return this.containerApplet;
+    },
+    getAbaCertificadoDigital: function() {
+        if (!this.abaCertificadoDigital) {
+            this.abaCertificadoDigital = Ext.widget("panel", {
+                title: 'Certificado Digital',
+                height: 140,
+                bodyPadding: "25 0 0 80",
+                border: false,
+                items: [
+                {
+                    xtype: 'box',
+                    autoEl: {
+                        children: [
+                        {
+                            tag: 'input', 
+                            type: 'hidden', 
+                            id: 'input_autenticacao_desafio'
+                        },
+                        {
+                            tag: 'input', 
+                            type: 'hidden', 
+                            id: 'input_autenticacao_saida'
+                        }
+                        ]
+                    }
+                },
+                this.getContainerApplet()
+                ],
+                listeners: {
+                    activate: function() {
+                        this.body.mask('Carregando...');
+                        this.getContainerApplet().show();
+                        Ext.Ajax.request({
+                            method: 'POST',
+                            url: "/autenticar/app/controllers/?c=TCE_Autenticar_Login&m=getDesafio",
+                            callback: function(options, success, response) {
+                                var obj = Ext.decode(response.responseText);
+                                Ext.getDom("input_autenticacao_desafio").value = obj.sha1;
+                                Ext.get("applet").applyStyles('z-index: 1;');
+                                this.body.unmask();
+                            },
+                            scope: this
+                        });
+                    },
+                    deactivate: function() {
+                        Ext.get("applet").applyStyles('z-index: -1;');
+                    },
+                    scope: this
+                }
+            });
+        }
+        return this.abaCertificadoDigital;
+    },
+    getAbaUsuarioSenha: function() {
+        if (!this.abaUsuarioSenha) {
+            this.abaUsuarioSenha = Ext.widget("form", {
+                title: 'Padrão',
+                url: '/autenticar/app/controllers/?c=TCE_Autenticar_Login&m=doAuth',
+                bodyPadding: 10,
+                border: false,
+                items: [
+                this.getCampoUsuario(),
+                this.getCampoSenha()
+                ],
+                buttons: [
+                this.getBotaoEntrar()
+                ]
+            });
+        }
+        return this.abaUsuarioSenha;
+    }
+});

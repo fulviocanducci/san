@@ -1,0 +1,15 @@
+Ext.define('Autenticar.form.Sistema', {
+    extend: 'Autenticar.form.ui.Sistema',
+    requires: ['Autenticar.store.Sistema', 'Ext.ux.StatusBar', 'Ext.ux.grid.HeaderToolTip'],
+    constructor: function() {
+        this.storeSistema = Ext.create('Autenticar.store.Sistema');
+        this.callParent(arguments);
+    },
+    inicializar: function() {
+        this.getBotaoEditar().disable();
+        this.getStoreSistema().load();
+    },
+    getStoreSistema: function() {
+        return this.storeSistema;
+    }
+});

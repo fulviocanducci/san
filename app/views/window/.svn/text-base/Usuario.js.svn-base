@@ -1,0 +1,7 @@
+Ext.define('Autenticar.window.Usuario', {
+    extend: 'Autenticar.window.ui.Usuario',
+    constructor: function() {
+        var me = this;
+        me.callParent(arguments);
+    }
+});

@@ -1,0 +1,8 @@
+Ext.define('Autenticar.window.Login', {
+   extend: 'Autenticar.window.ui.Login',
+
+   initComponent: function() {
+      var me = this;
+      me.callParent(arguments);
+   }
+});

@@ -1,0 +1,88 @@
+Ext.require('Ext.ux.CpfField');
+
+Ext.define('Autenticar.form.ui.Usuario', {
+   extend: 'Champion.form.Base',
+   title: 'Cadastro de Usuários',
+   bodyPadding: 5,
+   id: 'Autenticar.form.Usuario',
+   layout: 'anchor',
+   defaults: {
+      anchor: '100%'
+   },
+   items: [
+   {
+      xtype: 'textfield',
+      fieldLabel: 'Nome',
+      name: 'nome',
+      id: 'nome',
+      allowBlank: false
+   },
+   {
+      xtype: 'textfield',
+      fieldLabel: 'Matricula',
+      name: 'matricula',
+      id: 'matricula',
+      allowBlank: false
+   },
+   {
+      xtype: 'cpffield',
+      fieldLabel: 'CPF',
+      name: 'cpf',
+      id: 'cpf',
+      allowBlank: false
+   },
+   {
+      xtype: 'textfield',
+      fieldLabel: 'Login',
+      name: 'login',
+      id: 'login',
+      allowBlank: false
+   },
+   {
+      xtype: 'textfield',
+      fieldLabel: 'Senha',
+      type: 'password',
+      name: 'senha',
+      id: 'senha',
+      allowBlank: false
+   },
+   {
+      xtype: 'textfield',
+      fieldLabel: 'E-mail',
+      name: 'email',
+      id: 'email',
+      allowBlank: false
+   }
+   ],
+
+   tools: [{
+      type: 'help',
+      tooltip: 'Ajuda',
+      handler: function() {
+      }
+   },{
+      type: 'close',
+      tooltip: 'Fechar',
+      handler: function() {
+         this.up('form').close();
+      }
+   }],
+   buttons: [{
+      text: 'Salvar',
+      formBind: true, //only enabled once the form is valid
+      handler: function() {
+         var form = this.up('form').getForm();
+         if (form.isValid()) {
+            form.submit({
+               url: TCE.Autenticar.getUrlController('Usuario', 'salvar'),
+               success: function(form, action) {
+                  Ext.Msg.alert('Successo', action.result.msg);
+               },
+               failure: function(form, action) {
+                  Ext.Msg.alert('Falhou', action.result.msg);
+               }
+            });
+         }
+      }
+   }]
+});

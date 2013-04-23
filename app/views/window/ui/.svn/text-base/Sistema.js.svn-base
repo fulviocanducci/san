@@ -1,0 +1,180 @@
+Ext.define('Autenticar.window.ui.Sistema', {
+    extend: 'Champion.window.Base',
+    id: 'Autenticar.window.Sistema',
+    layout: 'fit',
+    height: 265,
+    width: 500,
+    title: 'Criação/Modificação de Sistemas',
+    modal: true,
+    resizable: false,
+    initComponent: function() {
+        var me = this;
+        Ext.apply(me, {
+            items: [
+            {
+                xtype: 'form',
+                layout: 'anchor',
+                bodyPadding: 10,
+                defaults: {
+                    anchor: '100%'
+                },
+                border: false,
+                items: [
+                {
+                    xtype: 'hidden',
+                    name: 'id'
+                },
+                {
+                    xtype: 'textfield',
+                    fieldLabel: 'Descrição',
+                    labelWidth: 90,
+                    name: 'descricao',
+                    allowBlank: false
+                },
+                {
+                    xtype: 'textfield',
+                    fieldLabel: 'Sigla',
+                    labelWidth: 90,
+                    name: 'sigla',
+                    allowBlank: false
+                },
+                {
+                    xtype: 'textfield',
+                    fieldLabel: 'Namespace',
+                    labelWidth: 90,
+                    name: 'nome_interno',
+                    allowBlank: false
+                },
+                {
+                    xtype: 'textfield',
+                    fieldLabel: 'URL Ícone',
+                    labelWidth: 90,
+                    name: 'url_icone',
+                    allowBlank: false
+                },
+                this.getCheckboxCriarProjeto(),
+                this.getCheckboxCriarRepostiorio()
+                ]
+            }
+            ],
+            buttons: [
+            this.getBotaoSalvar(),
+            this.getBotaoExcluir(),
+            {
+                text: 'Fechar',
+                iconCls: 'silk-cross',
+                handler: function() {
+                    this.close();
+                },
+                scope: this
+            }
+            ]
+        });
+        me.callParent(arguments);
+    },
+    getCheckboxCriarRepostiorio: function() {
+        if (!this.checkboxCriarRepostiorio) {
+            this.checkboxCriarRepostiorio = Ext.widget("checkbox", {
+                fieldLabel: 'Criar projeto',
+                labelWidth: 100,
+                name: 'criar_projeto',
+                checked: true,
+                disabled: true,
+                flex: 1
+            });
+        }
+        return this.checkboxCriarRepostiorio;
+    },
+    getCheckboxCriarProjeto: function() {
+        if (!this.checkboxCriarProjeto) {
+            this.checkboxCriarProjeto = Ext.widget("checkbox", {
+                fieldLabel: 'Criar repositório',
+                labelWidth: 100,
+                name: 'criar_repositorio',
+                checked: true,
+                disabled: true,
+                flex: 1
+            });
+        }
+        return this.checkboxCriarProjeto;
+    },
+    getBotaoSalvar: function() {
+        if (!this.botaoSalvar) {
+            this.botaoSalvar = Ext.widget("button", {
+                text: 'Salvar',
+                iconCls: 'silk-disk',
+                formBind: true,
+                handler: function() {
+                    var form = this.down('form').getForm();
+                    if (form.isValid()) {
+                        this.mask('Aguarde...');
+                        form.submit({
+                            url: TCE.Autenticar.getUrlController('Sistema', 'salvar'),
+                            success: function(form, action) {
+                                var response = action.result;
+                                this.getFormSistema().inicializar();
+                                this.getFormSistema().getBarraStatus().setStatus({
+                                    text: response.msg,
+                                    iconCls: 'x-status-valid',
+                                    clear: true
+                                });
+                                this.close();
+                            },
+                            failure: function(form, action) {
+                                var response = action.result;
+                                this.getFormSistema().getBarraStatus().setStatus({
+                                    text: response.msg,
+                                    iconCls: 'x-status-error'
+                                });
+                                this.unmask();
+                            },
+                            scope: this
+                        });
+                    }
+                },
+                scope: this
+            });
+        }
+        return this.botaoSalvar;
+    },
+    getBotaoExcluir: function() {
+        if (!this.botaoExcluir) {
+            this.botaoExcluir = Ext.widget("button", {
+                text: 'Excluir',
+                iconCls: 'silk-delete',
+                //disabled: true,
+                handler: function() {
+                    Ext.Msg.show({
+                        title: 'Confirmação de exclusão',
+                        msg: 'Deseja realmente excluir este sistema?',
+                        buttons: Ext.Msg.YESNO,
+                        icon: Ext.Msg.QUESTION,
+                        fn: function(resp) {
+                            if (resp == 'yes') {
+                                this.getFormSistema().getStoreSistema().remove(this.getFormSistema().getGridSistema().getSelectionModel().getSelection());
+                                this.getFormSistema().getStoreSistema().sync({
+                                    success: function(batch, options) {
+                                        this.getFormSistema().inicializar();
+                                        this.getFormSistema().getBarraStatus().setStatus({
+                                            text: "Sistema excluído com sucesso!",
+                                            iconCls: 'x-status-valid',
+                                            clear: true
+                                        });
+                                        this.close();
+                                    },
+                                    scope: this
+                                });
+                            }
+                        },
+                        scope: this
+                    });
+                },
+                scope: this
+            });
+        }
+        return this.botaoExcluir;
+    },    
+    getFormSistema: function() {
+        return this.formSistema;
+    }
+});

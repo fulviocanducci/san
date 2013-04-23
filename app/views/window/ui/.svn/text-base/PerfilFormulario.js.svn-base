@@ -1,0 +1,552 @@
+Ext.define('Autenticar.window.ui.PerfilFormulario', {
+    extend: 'Champion.window.Base',
+    requires: ['Ext.ux.StatusBar'],
+    id: 'Autenticar.window.PerfilFormulario',
+    layout: {
+        type: 'vbox',
+        align: 'stretch'
+    },
+    bodyPadding: 10,
+    height: 500,
+    width: 850,
+    title: 'Associação de Perfil à Formulários',
+    modal: true,
+    resizable: false,
+    initComponent: function() {
+        var me = this;
+
+        Ext.apply(me, {
+            items: [
+            {
+                xtype: 'panel',
+                border: 0,
+                layout: {
+                    type: 'hbox',
+                    align: 'stretch'
+                },
+                items: [
+                {
+                    xtype: 'panel',
+                    padding: '0 5 0 0',
+                    layout: 'fit',
+                    rbar: [
+                    this.getBotaoAdicionarPerfil(),
+                    this.getBotaoEditarPerfil()                        
+                    ],
+                    items: [
+                    this.getGridPerfis()
+                    ],
+                    flex: 3
+                },
+                {
+                    xtype: 'panel',
+                    padding: '0 0 0 5',
+                    layout: 'fit',
+                    rbar: [
+                    this.getBotaoAdicionarFormulario(),
+                    this.getBotaoEditarFormulario()
+                    ],
+                    items: [
+                    this.getGridFormularios()
+                    ],
+                    flex: 3
+                }
+                ],
+                flex: 2
+            },
+            {
+                xtype: 'panel',
+                layout: 'fit',
+                border: 0,
+                flex: 0.5,
+                items: [
+                {
+                    xtype: 'container',
+                    layout: {
+                        type: 'hbox',
+                        align: 'middle',
+                        pack: 'center'
+                    },
+                    items: [
+                    this.getBotaoAdicionarPermissao(),
+                    this.getBotaoRemoverPermissao()
+                    ]
+                }
+                ]
+            },
+            this.getGridPerfilFormulario()
+            ],
+            bbar: this.getBarraStatus()
+        });
+        me.callParent(arguments);
+    },
+    getGridPerfis: function() {
+        if (!this.gridPerfis) {
+            this.gridPerfis = Ext.widget("gridpanel", {
+                border: false,
+                viewConfig  : {
+                    loadMask: true
+                },
+                autoScroll: true,
+                title: 'Perfis',
+                store: this.storePerfil,
+                columns: [
+                {
+                    header: 'Descrição',
+                    dataIndex: 'descricao',
+                    sortable: true,
+                    flex: 1
+                },
+                {
+                    header: 'Padrão',
+                    dataIndex: 'padrao',
+                    align: 'center',
+                    resizable: false,
+                    sortable: false,
+                    width: 70,
+                    renderer: function(val, metadata, record) {
+                        val = parseInt(val);
+                        if (val) {
+                            return Ext.String.format('<input name="padrao" class="x-row-radio" style="height: 12px;" type="radio" checked="checked" onchange="TCE.Autenticar.PerfilFormulario.setPerfilPadrao({0});"/>', record.internalId);
+                        } else {
+                            return Ext.String.format('<input name="padrao" class="x-row-checkbox" style="height: 12px;" type="radio" onchange="TCE.Autenticar.PerfilFormulario.setPerfilPadrao({0});"/>', record.internalId);
+                        }
+                    }
+                }
+                ],
+                listeners: {
+                    itemclick: function(el, record) {
+                        this.perfil_id = record.internalId;
+                        this.getBotaoEditarPerfil().enable();
+                        //this.getBotaoExcluirPerfil().enable();
+                        this.getBarraStatus().showBusy();
+                        this.resetarGridFormularios();
+                        this.resetarGridPerfiFormulario();
+                    },
+                    scope: this
+                }
+            });
+        }
+        return this.gridPerfis;
+    },
+    getGridFormularios: function() {
+        if (!this.gridFormularios) {
+            this.gridFormularios = Ext.widget("gridpanel", {
+                border: false,
+                viewConfig  : {
+                    loadMask: true
+                },
+                autoScroll: true,
+                title: 'Formulários',
+                store: this.storeFormulario,
+                multiSelect: true,
+                tbar: {
+                    xtype: 'toolbar',
+                    layout: 'hbox',
+                    padding: '5 5 5 5',
+                    items: [
+                    this.getCheckboxFormulariosAssociados(),
+                    this.getCheckboxFormulariosNaoAssociados(),
+                    this.getCampoPesquisarFormulario()
+                    ]
+                },
+                columns: [
+                {
+                    header: 'Descrição',
+                    dataIndex: 'descricao',
+                    flex: 1,
+                    renderer: function(val, metadata, record) {
+                        if (Ext.isEmpty(record.data.perfil_formulario_id)) {
+                            return Ext.String.format('<span style="color:red;">{0}</span>', val);
+                        } else {
+                            return Ext.String.format('<span style="color:green;">{0}</span>', val);
+                        }
+                    }
+                }
+                ],
+                listeners: {
+                    itemclick: function(el, record) {
+                        if (this.getGridPerfis().getSelectionModel().hasSelection() && Ext.isEmpty(record.data.perfil_formulario_id) && this.temPermissaoIncluir()) {
+                            this.getBotaoAdicionarPermissao().enable();
+                        } else {
+                            this.getBotaoAdicionarPermissao().disable();
+                        }
+                        this.formulario_id = record.internalId;
+                        this.getBotaoEditarFormulario().enable();
+                    //this.getBotaoExcluirFormulario().enable();
+                    },
+                    scope: this
+                }
+            });
+        }
+        return this.gridFormularios;
+    },
+    getBotaoAdicionarPerfil: function() {
+        if (!this.botaoAdicionarPerfil) {
+            this.botaoAdicionarPerfil = Ext.widget("button", {
+                iconCls: 'silk-add',
+                handler: function() {
+                    Ext.create('Autenticar.window.Perfil', {
+                        sistema_id: this.sistema_id
+                    }).show();
+                },
+                scope: this
+            });
+        }
+        return this.botaoAdicionarPerfil;
+    },
+    getBotaoEditarPerfil: function() {
+        if (!this.botaoEditarPerfil) {
+            this.botaoEditarPerfil = Ext.widget("button", {
+                iconCls: 'silk-pencil',
+                handler: function() {
+                    Ext.create('Autenticar.window.Perfil', {
+                        perfil_id: this.perfil_id,
+                        sistema_id: this.sistema_id
+                    }).show();
+                },
+                scope: this
+            });
+        }
+        return this.botaoEditarPerfil;
+    },
+    //    getBotaoExcluirPerfil: function() {
+    //        if (!this.botaoExcluirPerfil) {
+    //            this.botaoExcluirPerfil = Ext.widget("button", {
+    //                iconCls: 'silk-delete',
+    //                handler: function() {
+    //                    Ext.Msg.show({
+    //                        title: 'Confirmação de exclusão',
+    //                        msg: 'Deseja realmente excluir este perfil?',
+    //                        buttons: Ext.Msg.YESNO,
+    //                        icon: Ext.Msg.QUESTION,
+    //                        fn: function(resp) {
+    //                            if (resp == 'yes') {
+    //                                this.storePerfil.remove(this.getGridPerfis().getSelectionModel().getSelection());
+    //                                this.storePerfil.sync({
+    //                                    success: function(batch, options) {
+    //                                        this.inicializar();
+    //                                        this.getBarraStatus().setStatus({
+    //                                            text: "Perfil excluído com sucesso!",
+    //                                            iconCls: 'x-status-valid',
+    //                                            clear: true
+    //                                        });
+    //                                    },
+    //                                    scope: this
+    //                                });
+    //                            }
+    //                        },
+    //                        scope: this
+    //                    });
+    //                },
+    //                scope: this
+    //            });
+    //        }
+    //        return this.botaoExcluirPerfil;
+    //    },
+    getBotaoAdicionarFormulario: function() {
+        if (!this.botaoAdicionarFormulario) {
+            this.botaoAdicionarFormulario = Ext.widget("button", {
+                iconCls: 'silk-add',
+                handler: function() {
+                    Ext.create('Autenticar.window.Formulario', {
+                        sistema_id: this.sistema_id
+                    }).show();
+                },
+                scope: this
+            });
+        }
+        return this.botaoAdicionarFormulario;
+    },
+    getBotaoEditarFormulario: function() {
+        if (!this.botaoEditarFormulario) {
+            this.botaoEditarFormulario = Ext.widget("button", {
+                iconCls: 'silk-pencil',
+                id: 'Autenticar.form.PerfilFormulario.EditarFormulario',
+                handler: function() {
+                    Ext.create('Autenticar.window.Formulario', {
+                        formulario_id: this.formulario_id,
+                        sistema_id: this.sistema_id
+                    }).show();
+                },
+                scope: this
+            });
+        }
+        return this.botaoEditarFormulario;
+    },
+    //    getBotaoExcluirFormulario: function() {
+    //        if (!this.botaoExcluirFormulario) {
+    //            this.botaoExcluirFormulario = Ext.widget("button", {
+    //                iconCls: 'silk-delete',
+    //                handler: function() {
+    //                    Ext.Msg.show({
+    //                        title: 'Confirmação de exclusão',
+    //                        msg: 'Deseja realmente excluir este formulário?',
+    //                        buttons: Ext.Msg.YESNO,
+    //                        icon: Ext.Msg.QUESTION,
+    //                        fn: function(resp) {
+    //                            if (resp == 'yes') {
+    //                                this.storeFormulario.remove(this.getGridFormularios().getSelectionModel().getSelection());
+    //                                this.storeFormulario.sync({
+    //                                    success: function(batch, options) {
+    //                                        this.resetarGridFormularios();
+    //                                        this.getBarraStatus().setStatus({
+    //                                            text: "Formulário excluído com sucesso!",
+    //                                            iconCls: 'x-status-valid',
+    //                                            clear: true
+    //                                        });
+    //                                    },
+    //                                    scope: this
+    //                                });
+    //                            }
+    //                        },
+    //                        scope: this
+    //                    });
+    //                },
+    //                scope: this
+    //            });
+    //        }
+    //        return this.botaoExcluirFormulario;
+    //    },
+    getBotaoAdicionarPermissao: function() {
+        if (!this.botaoAdicionarPermissao) {
+            this.botaoAdicionarPermissao = Ext.widget("button", {
+                iconCls: 'silk-arrow-down',
+                text: 'Adicionar',
+                handler: function() {
+                    perfil_id = this.getGridPerfis().getSelectionModel().getSelection()[0].internalId;
+                    formularios = this.getGridFormularios().getSelectionModel().getSelection();
+                    formulario_id = new Array();
+                    for (i in formularios) {
+                        formulario_id.push(formularios[i].internalId);
+                    }
+                    response = TCE.Autenticar.PerfilFormulario.adicionarPermissao(perfil_id, formulario_id);
+                    if (response.success) {
+                        this.getBarraStatus().setStatus({
+                            text: response.msg,
+                            iconCls: 'x-status-valid',
+                            clear: true
+                        });
+                    } else {
+                        this.getBarraStatus().setStatus({
+                            text: response.msg,
+                            iconCls: 'x-status-error'
+                        });
+                    }
+                    this.resetarGridFormularios();
+                    this.resetarGridPerfiFormulario();
+                    this.getBotaoAdicionarPermissao().disable();
+                },
+                scope: this
+            });
+        }
+        return this.botaoAdicionarPermissao;
+    },
+    getBotaoRemoverPermissao: function() {
+        if (!this.botaoRemoverPermissao) {
+            this.botaoRemoverPermissao = Ext.widget("button", {
+                iconCls: 'silk-arrow-up',
+                text: 'Remover',
+                handler: function() {
+                    perfil_formularios = this.getGridPerfilFormulario().getSelectionModel().getSelection();
+                    pefil_formulario_id = new Array();
+                    for (i in perfil_formularios) {
+                        pefil_formulario_id.push(perfil_formularios[i].internalId);
+                    }
+                    response = TCE.Autenticar.PerfilFormulario.removerPermissao(pefil_formulario_id);
+                    if (response.success) {
+                        this.getBarraStatus().setStatus({
+                            text: response.msg,
+                            iconCls: 'x-status-valid',
+                            clear: true
+                        });
+                    } else {
+                        this.getBarraStatus().setStatus({
+                            text: response.msg,
+                            iconCls: 'x-status-error'
+                        });
+                    }
+                    this.resetarGridFormularios();
+                    this.resetarGridPerfiFormulario();
+                    this.getBotaoRemoverPermissao().disable();
+                },
+                scope: this
+            });
+        }
+        return this.botaoRemoverPermissao;
+    },
+    getGridPerfilFormulario: function() {
+        if (!this.gridPerfilFormulario) {
+            this.gridPerfilFormulario = Ext.widget("gridpanel", {
+                title: 'Formulários associados ao perfil',
+                store: this.storePerfilFormulario,
+                viewConfig  : {
+                    loadMask: true
+                },
+                multiSelect: true,
+                columns: [
+                {
+                    header: 'Descrição',
+                    dataIndex: 'formulario_descricao',
+                    flex: 1
+                },
+                {
+                    header: 'Incluir',
+                    align: 'center',
+                    dataIndex: 'incluir',
+                    sortable: false,
+                    renderer: function(val, metadata, record) {
+                        val = parseInt(val);
+                        if (val) {
+                            return Ext.String.format('<input class="x-row-checkbox" style="height: 12px;" type="checkbox" checked="checked" onchange="TCE.Autenticar.PerfilFormulario.setPermissao({0}, {1}, this.checked);"/>', record.internalId, "'incluir'");
+                        } else {
+                            return Ext.String.format('<input class="x-row-checkbox" style="height: 12px;" type="checkbox" onchange="TCE.Autenticar.PerfilFormulario.setPermissao({0}, {1}, this.checked);"/>', record.internalId, "'incluir'");
+                        }
+                    },
+                    width: 60
+                },
+                {
+                    header: 'Alterar',
+                    align: 'center',
+                    dataIndex: 'alterar',
+                    sortable: false,
+                    renderer: function(val, metadata, record) {
+                        val = parseInt(val);
+                        if (val) {
+                            return Ext.String.format('<input class="x-row-checkbox" style="height: 12px;" type="checkbox" checked="checked" onchange="TCE.Autenticar.PerfilFormulario.setPermissao({0}, {1}, this.checked);"/>', record.internalId, "'alterar'");
+                        } else {
+                            return Ext.String.format('<input class="x-row-checkbox" style="height: 12px;" type="checkbox" onchange="TCE.Autenticar.PerfilFormulario.setPermissao({0}, {1}, this.checked);"/>', record.internalId, "'alterar'");
+                        }
+                    },
+                    width: 60
+                },
+                {
+                    header: 'Excluir',
+                    align: 'center',
+                    dataIndex: 'excluir',
+                    sortable: false,
+                    renderer: function(val, metadata, record) {
+                        val = parseInt(val);
+                        if (val) {
+                            return Ext.String.format('<input class="x-row-checkbox" style="height: 12px;" type="checkbox" checked="checked" onchange="TCE.Autenticar.PerfilFormulario.setPermissao({0}, {1}, this.checked);"/>', record.internalId, "'excluir'");
+                        } else {
+                            return Ext.String.format('<input class="x-row-checkbox" style="height: 12px;" type="checkbox" onchange="TCE.Autenticar.PerfilFormulario.setPermissao({0}, {1}, this.checked);"/>', record.internalId, "'excluir'");
+                        }
+                    },
+                    width: 60
+                },
+                {
+                    header: 'Acesso externo',
+                    align: 'center',
+                    dataIndex: 'acesso_externo',
+                    sortable: false,
+                    renderer: function(val, metadata, record) {
+                        val = parseInt(val);
+                        if (val) {
+                            return Ext.String.format('<input class="x-row-checkbox" style="height: 12px;" type="checkbox" checked="checked" onchange="TCE.Autenticar.PerfilFormulario.setPermissao({0}, {1}, this.checked);"/>', record.internalId, "'acesso_externo'");
+                        } else {
+                            return Ext.String.format('<input class="x-row-checkbox" style="height: 12px;" type="checkbox" onchange="TCE.Autenticar.PerfilFormulario.setPermissao({0}, {1}, this.checked);"/>', record.internalId, "'acesso_externo'");
+                        }
+                    },
+                    width: 100
+                }
+                ],
+                listeners: {
+                    itemclick: function(el, record) {
+                        if (this.temPermissaoExcluir()) {
+                            this.getBotaoRemoverPermissao().enable();
+                        }
+                    },
+                    scope: this
+                },
+                flex: 2
+            });
+        }
+        return this.gridPerfilFormulario;
+    },
+    getBarraStatus: function() {
+        if (!this.barraStatus) {
+            this.barraStatus = Ext.widget("statusbar", {
+                border: false,
+                defaultText: '',
+                text: '',
+                iconCls: 'x-status-valid',
+                items: [
+                {
+                    text: 'Fechar',
+                    iconCls: 'silk-cross',
+                    handler: function() {
+                        this.close();
+                    },
+                    scope: this
+                }
+                ]
+            });
+        }
+        return this.barraStatus;
+    },
+    getCheckboxFormulariosAssociados : function() {
+        if (!this.checkboxFormulariosAssociados) {
+            this.checkboxFormulariosAssociados = Ext.widget("checkbox", {
+                boxLabel: 'Associados',
+                handler: function(checkbox, checked) {
+                    this.storeFormulario.clearFilter();
+                    if(checked) {
+                        this.storeFormulario.filterBy(function(record, id){
+                            return !Ext.isEmpty(record.data.perfil_formulario_id);
+                        });
+                        if (this.getCheckboxFormulariosNaoAssociados().getValue())
+                            this.getCheckboxFormulariosNaoAssociados().setValue(false);
+                    }
+                },
+                flex: 0.8,
+                scope: this
+            });
+        }
+        return this.checkboxFormulariosAssociados;
+    },
+    getCheckboxFormulariosNaoAssociados: function() {
+        if (!this.checkboxFormulariosNaoAssociados) {
+            this.checkboxFormulariosNaoAssociados = Ext.widget("checkbox", {
+                boxLabel: 'Não-Associados',
+                handler: function(checkbox, checked) {
+                    this.storeFormulario.clearFilter();
+                    if(checked) {
+                        this.storeFormulario.filterBy(function(record, id){
+                            return Ext.isEmpty(record.data.perfil_formulario_id);
+                        });
+                        if (this.getCheckboxFormulariosAssociados().getValue())
+                            this.getCheckboxFormulariosAssociados().setValue(false);
+                    }
+                },
+                flex: 1,
+                scope: this
+            });
+        }
+        return this.checkboxFormulariosNaoAssociados;
+    },
+    getCampoPesquisarFormulario: function() {
+        if (!this.campoPesquisarFormulario) {
+            this.campoPesquisarFormulario = Ext.widget("textfield", {
+                emptyText: 'Digite para filtrar...',
+                enableKeyEvents: true,
+                flex: 1.2,
+                listeners: {
+                    keyup: function(fieldText, e, eOpts) {
+                        this.storeFormulario.filterBy(function(record, id){
+                            palavra = fieldText.getValue();
+                            exp = "/" + palavra +  "/i";
+                            resp = record.data.descricao.match(eval(exp));
+                            if (resp !== null) {
+                                return true;
+                            }
+                            return false;
+                        });
+                    },
+                    scope: this
+                }
+            });
+        }
+        return this.campoPesquisarFormulario;
+    }
+});
